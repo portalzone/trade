@@ -28,7 +28,7 @@ export default function OrderDetailsPage() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -61,7 +61,6 @@ export default function OrderDetailsPage() {
       const data = await response.json();
 
       if (data.success) {
-        // API returns data.data.order, not data.data
         setOrder(data.data.order);
       } else {
         setError(data.error || 'Order not found');
@@ -79,7 +78,7 @@ export default function OrderDetailsPage() {
       return;
     }
 
-    setIsPurchasing(true);
+    setIsProcessing(true);
     setMessage('');
 
     const token = localStorage.getItem('auth_token');
@@ -98,7 +97,7 @@ export default function OrderDetailsPage() {
       if (data.success) {
         setMessage('✅ Purchase successful! Payment locked in escrow.');
         setTimeout(() => {
-          router.push('/dashboard');
+          window.location.reload();
         }, 2000);
       } else {
         setMessage('❌ ' + (data.error || data.message || 'Purchase failed'));
@@ -107,7 +106,85 @@ export default function OrderDetailsPage() {
       setMessage('❌ Connection error');
       console.error('Purchase error:', error);
     } finally {
-      setIsPurchasing(false);
+      setIsProcessing(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!confirm('Confirm delivery received? This will release payment to the seller.')) {
+      return;
+    }
+
+    setIsProcessing(true);
+    setMessage('');
+
+    const token = localStorage.getItem('auth_token');
+
+    try {
+      const response = await fetch(`http://localhost:8000/api/orders/${orderId}/complete`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setMessage('✅ Order completed! Payment released to seller.');
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        setMessage('❌ ' + (data.error || data.message || 'Failed to complete order'));
+      }
+    } catch (error) {
+      setMessage('❌ Connection error');
+      console.error('Complete error:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDispute = async () => {
+    const reason = prompt('Please describe the issue with this order:');
+    
+    if (!reason || reason.trim() === '') {
+      return;
+    }
+
+    setIsProcessing(true);
+    setMessage('');
+
+    const token = localStorage.getItem('auth_token');
+
+    try {
+      const response = await fetch(`http://localhost:8000/api/orders/${orderId}/dispute`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason: reason.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setMessage('✅ Dispute raised successfully. Admin will review.');
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        setMessage('❌ ' + (data.error || data.message || 'Failed to raise dispute'));
+      }
+    } catch (error) {
+      setMessage('❌ Connection error');
+      console.error('Dispute error:', error);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -136,7 +213,10 @@ export default function OrderDetailsPage() {
   }
 
   const isSeller = currentUser?.id === order.seller_id;
+  const isBuyer = currentUser?.id === order.buyer_id;
   const canPurchase = !isSeller && order.order_status === 'ACTIVE' && !order.buyer_id;
+  const canComplete = isBuyer && (order.order_status === 'IN_ESCROW' || order.order_status === 'PURCHASED');
+  const canDispute = isBuyer && (order.order_status === 'IN_ESCROW' || order.order_status === 'PURCHASED');
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -160,7 +240,7 @@ export default function OrderDetailsPage() {
                 <h1 className="text-3xl font-bold mb-2">{order.title}</h1>
                 <p className="text-blue-100">Listed {new Date(order.created_at).toLocaleDateString()}</p>
               </div>
-              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${order.order_status === 'ACTIVE' ? 'bg-green-500' : 'bg-gray-500'}`}>
+              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${order.order_status === 'ACTIVE' ? 'bg-green-500' : order.order_status === 'IN_ESCROW' ? 'bg-yellow-500' : order.order_status === 'COMPLETED' ? 'bg-purple-500' : 'bg-gray-500'}`}>
                 {order.order_status}
               </span>
             </div>
@@ -188,6 +268,13 @@ export default function OrderDetailsPage() {
                     <p className="text-sm text-blue-700 mt-1">Buyers can purchase this item. You'll receive payment after delivery confirmation.</p>
                   </div>
                 )}
+
+                {isBuyer && canComplete && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-yellow-900 font-semibold">⏳ Awaiting Delivery Confirmation</p>
+                    <p className="text-sm text-yellow-700 mt-1">Once you receive the item, click "Confirm Delivery" to release payment.</p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-6">
@@ -198,8 +285,8 @@ export default function OrderDetailsPage() {
 
                 {canPurchase && (
                   <div className="space-y-4">
-                    <button onClick={handlePurchase} disabled={isPurchasing} className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold transition disabled:opacity-50">
-                      {isPurchasing ? 'Processing...' : 'Purchase Now'}
+                    <button onClick={handlePurchase} disabled={isProcessing} className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold transition disabled:opacity-50">
+                      {isProcessing ? 'Processing...' : 'Purchase Now'}
                     </button>
 
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -211,6 +298,17 @@ export default function OrderDetailsPage() {
                         <li>• Platform fee: 2.5%</li>
                       </ul>
                     </div>
+                  </div>
+                )}
+
+                {canComplete && (
+                  <div className="space-y-3">
+                    <button onClick={handleComplete} disabled={isProcessing} className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold transition disabled:opacity-50">
+                      {isProcessing ? 'Processing...' : '✓ Confirm Delivery'}
+                    </button>
+                    <button onClick={handleDispute} disabled={isProcessing} className="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 font-semibold transition disabled:opacity-50">
+                      {isProcessing ? 'Processing...' : '⚠ Raise Dispute'}
+                    </button>
                   </div>
                 )}
 

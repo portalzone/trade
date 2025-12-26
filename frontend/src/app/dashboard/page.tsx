@@ -61,7 +61,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Quick Links */}
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-4 gap-4 mb-6">
             <Link href="/marketplace" className="bg-blue-600 text-white p-6 rounded-lg hover:bg-blue-700 transition text-center">
               <p className="text-3xl mb-2">🛍️</p>
               <p className="font-semibold">Marketplace</p>
@@ -79,6 +79,17 @@ export default function DashboardPage() {
               <p className="font-semibold">Create Order</p>
             </Link>
           </div>
+
+          {/* Admin Link (only for admins) */}
+          {user.user_type === 'ADMIN' && (
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold mb-4">Admin Panel</h3>
+              <Link href="/admin/disputes" className="block bg-red-600 text-white p-6 rounded-lg hover:bg-red-700 transition text-center">
+                <p className="text-3xl mb-2">⚖️</p>
+                <p className="font-semibold">Manage Disputes</p>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>
