@@ -1,0 +1,425 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Services\Payment\PaystackService;
+use App\Services\Payment\StripeService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+
+class PaymentController extends Controller
+{
+    protected PaystackService $paystack;
+    protected StripeService $stripe;
+
+    public function __construct(PaystackService $paystack, StripeService $stripe)
+    {
+        $this->paystack = $paystack;
+        $this->stripe = $stripe;
+    }
+
+    /**
+     * Initialize deposit (funding wallet)
+     */
+    public function initiateDeposit(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'amount' => 'required|numeric|min:' . config('payments.min_deposit'),
+            'gateway' => 'required|in:paystack,stripe',
+            'currency' => 'required|in:NGN,USD',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = $request->user();
+        $amount = $request->amount;
+        $gateway = $request->gateway;
+
+        try {
+            DB::beginTransaction();
+
+            // Create pending transaction record
+            $transaction = DB::table('payment_transactions')->insertGetId([
+                'user_id' => $user->id,
+                'wallet_id' => $user->wallet->id,
+                'type' => 'CREDIT',
+                'gateway' => strtoupper($gateway),
+                'amount' => $amount,
+                'currency' => $request->currency,
+                'status' => 'PENDING',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Initialize payment based on gateway
+            if ($gateway === 'paystack') {
+                $payment = $this->paystack->initializePayment($user, $amount, [
+                    'transaction_id' => $transaction,
+                ]);
+
+                DB::table('payment_transactions')
+                    ->where('id', $transaction)
+                    ->update([
+                        'gateway_reference' => $payment['reference'],
+                        'gateway_data' => json_encode($payment),
+                    ]);
+
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment initialized successfully',
+                    'data' => [
+                        'transaction_id' => $transaction,
+                        'authorization_url' => $payment['authorization_url'],
+                        'reference' => $payment['reference'],
+                    ],
+                ]);
+            } else {
+                $payment = $this->stripe->initializePayment($user, $amount, [
+                    'transaction_id' => $transaction,
+                ]);
+
+                DB::table('payment_transactions')
+                    ->where('id', $transaction)
+                    ->update([
+                        'gateway_reference' => $payment['payment_intent_id'],
+                        'gateway_data' => json_encode($payment),
+                    ]);
+
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment initialized successfully',
+                    'data' => [
+                        'transaction_id' => $transaction,
+                        'client_secret' => $payment['client_secret'],
+                        'payment_intent_id' => $payment['payment_intent_id'],
+                    ],
+                ]);
+            }
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment initialization failed',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Verify and complete deposit
+     */
+    public function verifyDeposit(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'reference' => 'required|string',
+            'gateway' => 'required|in:paystack,stripe',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $gateway = $request->gateway;
+        $reference = $request->reference;
+
+        try {
+            DB::beginTransaction();
+
+            // Verify payment with gateway
+            if ($gateway === 'paystack') {
+                $verification = $this->paystack->verifyPayment($reference);
+            } else {
+                $verification = $this->stripe->verifyPayment($reference);
+            }
+
+            // Find transaction
+            $transaction = DB::table('payment_transactions')
+                ->where('gateway_reference', $reference)
+                ->first();
+
+            if (!$transaction) {
+                throw new \Exception('Transaction not found');
+            }
+
+            if ($transaction->status === 'COMPLETED') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment already verified',
+                    'data' => [
+                        'transaction_id' => $transaction->id,
+                        'amount' => $transaction->amount,
+                    ],
+                ]);
+            }
+
+            // Update transaction status
+            DB::table('payment_transactions')
+                ->where('id', $transaction->id)
+                ->update([
+                    'status' => 'COMPLETED',
+                    'completed_at' => now(),
+                    'gateway_data' => json_encode($verification),
+                    'updated_at' => now(),
+                ]);
+
+            // Credit user wallet (total_balance auto-updates)
+            DB::table('wallets')
+                ->where('id', $transaction->wallet_id)
+                ->increment('available_balance', $verification['amount']);
+
+            // Create ledger entry (correct column names)
+            DB::table('ledger_entries')->insert([
+                'transaction_id' => Str::uuid(),
+                'wallet_id' => $transaction->wallet_id,
+                'type' => 'CREDIT',
+                'amount' => $verification['amount'],
+                'description' => 'Wallet funded via ' . $gateway,
+                'reference_table' => 'payment_transactions',
+                'reference_id' => $transaction->id,
+                'created_at' => now(),
+            ]);
+
+            DB::commit();
+
+            $newBalance = DB::table('wallets')->where('id', $transaction->wallet_id)->value('total_balance');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment verified and wallet credited successfully',
+                'data' => [
+                    'transaction_id' => $transaction->id,
+                    'amount' => $verification['amount'],
+                    'new_balance' => $newBalance,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment verification failed',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Initiate withdrawal
+     */
+    public function initiateWithdrawal(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'amount' => 'required|numeric|min:' . config('payments.min_withdrawal'),
+            'gateway' => 'required|in:paystack,stripe',
+            'bank_details' => 'required|array',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = $request->user();
+        $amount = $request->amount;
+        $gateway = $request->gateway;
+        $bankDetails = $request->bank_details;
+
+        // Check wallet balance
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->first();
+
+        if ($wallet->available_balance < $amount) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Insufficient wallet balance',
+            ], 400);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Calculate fees
+            $fee = config('payments.fees.withdrawal.flat_fee') + 
+                   ($amount * config('payments.fees.withdrawal.percentage'));
+            $totalDeduction = $amount + $fee;
+
+            // Create withdrawal transaction
+            $transaction = DB::table('payment_transactions')->insertGetId([
+                'user_id' => $user->id,
+                'wallet_id' => $wallet->id,
+                'type' => 'WITHDRAWAL',
+                'gateway' => strtoupper($gateway),
+                'amount' => $amount,
+                'fee' => $fee,
+                'currency' => 'NGN',
+                'status' => 'PENDING',
+                'bank_details' => json_encode($bankDetails),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Initiate transfer with gateway
+            if ($gateway === 'paystack') {
+                $transfer = $this->paystack->initiateTransfer($user, $amount, $bankDetails);
+            } else {
+                $transfer = $this->stripe->initiatePayout($user, $amount, $bankDetails);
+            }
+
+            // Update transaction
+            DB::table('payment_transactions')
+                ->where('id', $transaction)
+                ->update([
+                    'gateway_reference' => $transfer['reference'] ?? $transfer['payout_id'],
+                    'gateway_data' => json_encode($transfer),
+                    'status' => 'PROCESSING',
+                ]);
+
+            // Deduct from wallet (total_balance auto-updates)
+            DB::table('wallets')
+                ->where('id', $wallet->id)
+                ->decrement('available_balance', $totalDeduction);
+
+            // Create ledger entries (correct column names)
+            DB::table('ledger_entries')->insert([
+                [
+                    'transaction_id' => Str::uuid(),
+                    'wallet_id' => $wallet->id,
+                    'type' => 'WITHDRAWAL',
+                    'amount' => $amount,
+                    'description' => 'Withdrawal to bank account',
+                    'reference_table' => 'payment_transactions',
+                    'reference_id' => $transaction,
+                    'created_at' => now(),
+                ],
+                [
+                    'transaction_id' => Str::uuid(),
+                    'wallet_id' => $wallet->id,
+                    'type' => 'WITHDRAWAL',
+                    'amount' => $fee,
+                    'description' => 'Withdrawal fee',
+                    'reference_table' => 'payment_transactions',
+                    'reference_id' => $transaction,
+                    'created_at' => now(),
+                ],
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Withdrawal initiated successfully',
+                'data' => [
+                    'transaction_id' => $transaction,
+                    'amount' => $amount,
+                    'fee' => $fee,
+                    'total_deducted' => $totalDeduction,
+                    'status' => 'PROCESSING',
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Withdrawal failed',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get payment transaction history
+     */
+    public function getTransactions(Request $request)
+    {
+        $user = $request->user();
+
+        $transactions = DB::table('payment_transactions')
+            ->where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        return response()->json([
+            'success' => true,
+            'data' => $transactions,
+        ]);
+    }
+
+    /**
+     * Get banks (for Paystack)
+     */
+    public function getBanks()
+    {
+        try {
+            $banks = $this->paystack->listBanks();
+
+            return response()->json([
+                'success' => true,
+                'data' => $banks,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch banks',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Verify bank account (for Paystack)
+     */
+    public function verifyBankAccount(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'account_number' => 'required|string|size:10',
+            'bank_code' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            $verification = $this->paystack->verifyBankAccount(
+                $request->account_number,
+                $request->bank_code
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => $verification,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bank account verification failed',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+}
