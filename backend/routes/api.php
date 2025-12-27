@@ -292,3 +292,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/transaction-limits/stats', [App\Http\Controllers\Api\TransactionLimitController::class, 'getStats']);
     Route::post('/transaction-limits/check', [App\Http\Controllers\Api\TransactionLimitController::class, 'checkLimit']);
 });
+
+// Bank Accounts
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/bank-accounts', [App\Http\Controllers\Api\BankAccountController::class, 'index']);
+    Route::post('/bank-accounts', [App\Http\Controllers\Api\BankAccountController::class, 'store']);
+    Route::put('/bank-accounts/{id}/primary', [App\Http\Controllers\Api\BankAccountController::class, 'setPrimary']);
+    Route::delete('/bank-accounts/{id}', [App\Http\Controllers\Api\BankAccountController::class, 'destroy']);
+});
+
+// Withdrawals
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/withdrawals', [App\Http\Controllers\Api\WithdrawalController::class, 'index']);
+    Route::post('/withdrawals', [App\Http\Controllers\Api\WithdrawalController::class, 'store']);
+    Route::post('/withdrawals/{id}/cancel', [App\Http\Controllers\Api\WithdrawalController::class, 'cancel']);
+});
