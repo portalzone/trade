@@ -15,11 +15,6 @@ use App\Http\Controllers\Api\Admin\DisputeController;
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
 */
 
 // ============================================
@@ -29,7 +24,6 @@ use App\Http\Controllers\Api\Admin\DisputeController;
 // Health Check
 Route::get('/health', function () {
     try {
-        // Check database connection
         DB::connection()->getPdo();
         $dbStatus = 'connected';
     } catch (\Exception $e) {
@@ -37,7 +31,6 @@ Route::get('/health', function () {
     }
 
     try {
-        // Check Redis connection
         Cache::get('health_check');
         $redisStatus = 'connected';
     } catch (\Exception $e) {
@@ -60,13 +53,12 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
     
-    // Email & Phone Verification
     Route::post('/email/verification-notification', [AuthController::class, 'sendEmailVerification'])
-        ->middleware('throttle:6,1'); // Max 6 requests per minute
+        ->middleware('throttle:6,1');
     Route::post('/phone/send-otp', [AuthController::class, 'sendPhoneOtp'])
         ->middleware('throttle:6,1');
     Route::post('/phone/verify-otp', [AuthController::class, 'verifyPhoneOtp'])
-        ->middleware('throttle:3,1'); // Max 3 attempts per minute
+        ->middleware('throttle:3,1');
 });
 
 // ============================================
@@ -123,7 +115,6 @@ Route::middleware('auth:sanctum')->group(function () {
                 'data' => $breakdown
             ]);
         });
-        
     });
     
     // Payments Routes
@@ -136,7 +127,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/verify-bank-account', [PaymentController::class, 'verifyBankAccount']);
     });
     
-    // Audit Logs Routes (Compliance & Tracking)
+    // Audit Logs Routes
     Route::prefix('audit')->group(function () {
         Route::get('/logs', [AuditController::class, 'index']);
         Route::get('/logs/payments', [AuditController::class, 'getPaymentLogs']);
@@ -146,109 +137,103 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/statistics', [AuditController::class, 'getStatistics']);
     });
     
-    // Orders Routes (Week 2: Escrow System) - ACTIVE
+    // Orders Routes
     Route::prefix('orders')->group(function () {
-        // Marketplace/Browse
-        Route::get('/', [OrderController::class, 'index']); // Browse all active orders
-        Route::get('/my/selling', [OrderController::class, 'mySelling']); // My listings
-        Route::get('/my/buying', [OrderController::class, 'myBuying']); // My purchases
-        Route::get('/{id}', [OrderController::class, 'show']); // View order details
+        Route::get('/', [OrderController::class, 'index']);
+        Route::get('/my/selling', [OrderController::class, 'mySelling']);
+        Route::get('/my/buying', [OrderController::class, 'myBuying']);
+        Route::get('/{id}', [OrderController::class, 'show']);
         
-        // Seller Actions
-        Route::post('/', [OrderController::class, 'store']); // Create order
-        Route::put('/{id}', [OrderController::class, 'update']); // Update order
-        Route::delete('/{id}', [OrderController::class, 'destroy']); // Delete order
+        Route::post('/', [OrderController::class, 'store']);
+        Route::put('/{id}', [OrderController::class, 'update']);
+        Route::delete('/{id}', [OrderController::class, 'destroy']);
         
-        // Buyer Actions
-        Route::post('/{id}/purchase', [OrderController::class, 'purchase']); // Purchase order (lock funds)
-        Route::post('/{id}/complete', [OrderController::class, 'complete']); // Complete order (release funds)
+        Route::post('/{id}/purchase', [OrderController::class, 'purchase']);
+        Route::post('/{id}/complete', [OrderController::class, 'complete']);
         
-        // Shared Actions
-        Route::post('/{id}/cancel', [OrderController::class, 'cancel']); // Cancel order
-        Route::post('/{id}/dispute', [OrderController::class, 'dispute']); // Raise dispute
+        Route::post('/{id}/cancel', [OrderController::class, 'cancel']);
+        Route::post('/{id}/dispute', [OrderController::class, 'dispute']);
     });
     
-    // KYC Routes (TODO: Implement in Phase 3)
-    Route::prefix('kyc')->group(function () {
-        // Route::post('/tier-1/submit', [KycController::class, 'submitTier1']);
-        // Route::post('/tier-2/submit', [KycController::class, 'submitTier2']);
-        // Route::get('/status', [KycController::class, 'status']);
-    });
+    // Image Upload
+    Route::post('/orders/{orderId}/images', [ImageUploadController::class, 'uploadProductImages']);
+    Route::delete('/images/{imageId}', [ImageUploadController::class, 'deleteProductImage']);
     
-    // Disputes Routes (TODO: Implement in Phase 3)
-    Route::prefix('disputes')->group(function () {
-        // Route::get('/', [DisputeController::class, 'index']); // My disputes
-        // Route::get('/{id}', [DisputeController::class, 'show']); // View dispute
-        // Route::post('/{id}/message', [DisputeController::class, 'addMessage']); // Add message to dispute
-    });
-
+    // Transaction Limits
+    Route::get('/transaction-limits/stats', [App\Http\Controllers\Api\TransactionLimitController::class, 'getStats']);
+    Route::post('/transaction-limits/check', [App\Http\Controllers\Api\TransactionLimitController::class, 'checkLimit']);
     
+    // Bank Accounts
+    Route::get('/bank-accounts', [App\Http\Controllers\Api\BankAccountController::class, 'index']);
+    Route::post('/bank-accounts', [App\Http\Controllers\Api\BankAccountController::class, 'store']);
+    Route::put('/bank-accounts/{id}/primary', [App\Http\Controllers\Api\BankAccountController::class, 'setPrimary']);
+    Route::delete('/bank-accounts/{id}', [App\Http\Controllers\Api\BankAccountController::class, 'destroy']);
+    
+    // Withdrawals
+    Route::get('/withdrawals', [App\Http\Controllers\Api\WithdrawalController::class, 'index']);
+    Route::post('/withdrawals', [App\Http\Controllers\Api\WithdrawalController::class, 'store']);
+    Route::post('/withdrawals/{id}/cancel', [App\Http\Controllers\Api\WithdrawalController::class, 'cancel']);
+    
+    // Payment Links
+    Route::get('/payment-links', [App\Http\Controllers\Api\PaymentLinkController::class, 'index']);
+    Route::post('/payment-links', [App\Http\Controllers\Api\PaymentLinkController::class, 'store']);
+    Route::put('/payment-links/{id}', [App\Http\Controllers\Api\PaymentLinkController::class, 'update']);
+    Route::delete('/payment-links/{id}', [App\Http\Controllers\Api\PaymentLinkController::class, 'destroy']);
+    Route::get('/payment-links/{id}/stats', [App\Http\Controllers\Api\PaymentLinkController::class, 'stats']);
+    
+    // KYC Verification
+    Route::post('/kyc/verify-nin', [App\Http\Controllers\Api\KYCController::class, 'verifyNIN']);
+    Route::post('/kyc/verify-bvn', [App\Http\Controllers\Api\KYCController::class, 'verifyBVN']);
+    Route::get('/kyc/nin-status', [App\Http\Controllers\Api\KYCController::class, 'getNINStatus']);
+    Route::get('/kyc/bvn-status', [App\Http\Controllers\Api\KYCController::class, 'getBVNStatus']);
+    Route::get('/kyc/status', [App\Http\Controllers\Api\KYCController::class, 'getKYCStatus']);
 });
 
 // ============================================
-// WEBHOOK ROUTES (External Service Callbacks)
+// PUBLIC PAYMENT LINK ROUTES
+// ============================================
+
+Route::get('/pay/{slug}', [App\Http\Controllers\Api\PaymentLinkController::class, 'show']);
+Route::post('/pay/{slug}', [App\Http\Controllers\Api\PaymentLinkController::class, 'pay'])->middleware('auth:sanctum');
+
+// ============================================
+// WEBHOOK ROUTES
 // ============================================
 
 Route::prefix('webhooks')->group(function () {
-    // Payment Webhooks
     Route::post('/paystack', [WebhookController::class, 'paystackWebhook']);
     Route::post('/stripe', [WebhookController::class, 'stripeWebhook']);
-    
-    // Logistics Webhooks (TODO)
-    // Route::post('/logistics/{partner}', [WebhookController::class, 'logistics'])
-    //     ->middleware('verify.logistics.signature');
-    
-    // KYC Verification Webhooks (TODO)
-    // Route::post('/smile-id', [WebhookController::class, 'smileId'])
-    //     ->middleware('verify.smileid.signature');
 });
 
 // ============================================
-// ADMIN ROUTES (Admin Authentication Required)
+// ADMIN ROUTES
 // ============================================
 
 Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
-    
-    // Dispute Management (Week 3)
     Route::prefix('disputes')->group(function () {
-        Route::get('/', [DisputeController::class, 'index']); // List all disputes
+        Route::get('/', [DisputeController::class, 'index']);
         Route::get('/pending', function (Request $request) {
             $request->merge(['pending' => true]);
             return app(DisputeController::class)->index($request);
-        }); // Pending disputes only
-        Route::get('/statistics', [DisputeController::class, 'statistics']); // Dispute statistics
-        Route::get('/{id}', [DisputeController::class, 'show']); // View dispute details
-        Route::post('/{id}/resolve', [DisputeController::class, 'resolve']); // Resolve dispute
-        Route::post('/{id}/note', [DisputeController::class, 'addNote']); // Add admin note
+        });
+        Route::get('/statistics', [DisputeController::class, 'statistics']);
+        Route::get('/{id}', [DisputeController::class, 'show']);
+        Route::post('/{id}/resolve', [DisputeController::class, 'resolve']);
+        Route::post('/{id}/note', [DisputeController::class, 'addNote']);
     });
-    
-    // KYC Approvals (TODO)
-    // Route::get('/kyc/pending', [AdminKycController::class, 'pending']);
-    // Route::post('/kyc/{id}/approve', [AdminKycController::class, 'approve']);
-    // Route::post('/kyc/{id}/reject', [AdminKycController::class, 'reject']);
-    
-    // Transaction Monitoring (TODO)
-    // Route::get('/transactions/flagged', [AdminMonitoringController::class, 'flagged']);
-    // Route::get('/transactions/{id}', [AdminMonitoringController::class, 'show']);
-    
-    // System Configuration (TODO)
-    // Route::get('/config', [AdminConfigController::class, 'index']);
-    // Route::put('/config/{key}', [AdminConfigController::class, 'update']);
-    
-    // Admin Audit Logs (TODO)
-    // Route::get('/audit/logs', [AdminAuditController::class, 'index']);
-    // Route::get('/audit/user/{userId}', [AdminAuditController::class, 'getUserLogs']);
 });
 
 // ============================================
-// RATE LIMITING
+// OTP ENDPOINTS (Public)
 // ============================================
 
-// Apply rate limiting to all API routes
-Route::middleware('throttle:60,1')->group(function () {
-    // 60 requests per minute for authenticated users
-});
-// Email test route
+Route::post("/otp/send", [OtpController::class, "sendOtp"]);
+Route::post("/otp/verify", [OtpController::class, "verifyOtp"]);
+
+// ============================================
+// TEST ROUTES (Remove in production)
+// ============================================
+
 Route::get('/test-email', function () {
     try {
         \Illuminate\Support\Facades\Mail::raw('Test email from T-Trade!', function ($message) {
@@ -268,62 +253,10 @@ Route::get('/test-email', function () {
     }
 });
 
-// OTP endpoints (public)
-Route::post("/otp/send", [App\Http\Controllers\Api\OtpController::class, "sendOtp"]);
-Route::post("/otp/verify", [App\Http\Controllers\Api\OtpController::class, "verifyOtp"]);
-
-// Test Termii config
 Route::get("/test-termii", function() {
     return response()->json([
         "api_key" => config("termii.api_key"),
         "sender_id" => config("termii.sender_id"),
         "channel" => config("termii.channel"),
     ]);
-});
-
-// Image upload endpoints (authenticated)
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/orders/{orderId}/images', [App\Http\Controllers\Api\ImageUploadController::class, 'uploadProductImages']);
-    Route::delete('/images/{imageId}', [App\Http\Controllers\Api\ImageUploadController::class, 'deleteProductImage']);
-});
-
-// Transaction Limits
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/transaction-limits/stats', [App\Http\Controllers\Api\TransactionLimitController::class, 'getStats']);
-    Route::post('/transaction-limits/check', [App\Http\Controllers\Api\TransactionLimitController::class, 'checkLimit']);
-});
-
-// Bank Accounts
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/bank-accounts', [App\Http\Controllers\Api\BankAccountController::class, 'index']);
-    Route::post('/bank-accounts', [App\Http\Controllers\Api\BankAccountController::class, 'store']);
-    Route::put('/bank-accounts/{id}/primary', [App\Http\Controllers\Api\BankAccountController::class, 'setPrimary']);
-    Route::delete('/bank-accounts/{id}', [App\Http\Controllers\Api\BankAccountController::class, 'destroy']);
-});
-
-// Withdrawals
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/withdrawals', [App\Http\Controllers\Api\WithdrawalController::class, 'index']);
-    Route::post('/withdrawals', [App\Http\Controllers\Api\WithdrawalController::class, 'store']);
-    Route::post('/withdrawals/{id}/cancel', [App\Http\Controllers\Api\WithdrawalController::class, 'cancel']);
-});
-
-// Payment Links
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/payment-links', [App\Http\Controllers\Api\PaymentLinkController::class, 'index']);
-    Route::post('/payment-links', [App\Http\Controllers\Api\PaymentLinkController::class, 'store']);
-    Route::put('/payment-links/{id}', [App\Http\Controllers\Api\PaymentLinkController::class, 'update']);
-    Route::delete('/payment-links/{id}', [App\Http\Controllers\Api\PaymentLinkController::class, 'destroy']);
-    Route::get('/payment-links/{id}/stats', [App\Http\Controllers\Api\PaymentLinkController::class, 'stats']);
-});
-
-// Public payment link routes (no auth required for viewing/paying)
-Route::get('/pay/{slug}', [App\Http\Controllers\Api\PaymentLinkController::class, 'show']);
-Route::post('/pay/{slug}', [App\Http\Controllers\Api\PaymentLinkController::class, 'pay'])->middleware('auth:sanctum');
-
-// KYC Verification
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/kyc/verify-nin', [App\Http\Controllers\Api\KYCController::class, 'verifyNIN']);
-    Route::get('/kyc/nin-status', [App\Http\Controllers\Api\KYCController::class, 'getNINStatus']);
-    Route::get('/kyc/status', [App\Http\Controllers\Api\KYCController::class, 'getKYCStatus']);
 });
