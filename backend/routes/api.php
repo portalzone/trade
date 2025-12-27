@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\WebhookController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\OtpController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\ImageUploadController;
 use App\Http\Controllers\Api\Admin\DisputeController;
 
 /*
@@ -278,4 +279,10 @@ Route::get("/test-termii", function() {
         "sender_id" => config("termii.sender_id"),
         "channel" => config("termii.channel"),
     ]);
+});
+
+// Image upload endpoints (authenticated)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/orders/{orderId}/images', [App\Http\Controllers\Api\ImageUploadController::class, 'uploadProductImages']);
+    Route::delete('/images/{imageId}', [App\Http\Controllers\Api\ImageUploadController::class, 'deleteProductImage']);
 });

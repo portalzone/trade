@@ -7,6 +7,7 @@
     "require": {
         "php": "^8.3",
         "guzzlehttp/guzzle": "^7.8",
+        "intervention/image": "^3.11",
         "laravel/framework": "^11.0",
         "laravel/horizon": "^5.23",
         "laravel/octane": "^2.3",
