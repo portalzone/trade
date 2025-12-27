@@ -286,3 +286,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders/{orderId}/images', [App\Http\Controllers\Api\ImageUploadController::class, 'uploadProductImages']);
     Route::delete('/images/{imageId}', [App\Http\Controllers\Api\ImageUploadController::class, 'deleteProductImage']);
 });
+
+// Transaction Limits
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/transaction-limits/stats', [App\Http\Controllers\Api\TransactionLimitController::class, 'getStats']);
+    Route::post('/transaction-limits/check', [App\Http\Controllers\Api\TransactionLimitController::class, 'checkLimit']);
+});

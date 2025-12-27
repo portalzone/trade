@@ -10,10 +10,12 @@ use Illuminate\Support\Facades\DB;
 class OrderService
 {
     protected EscrowService $escrowService;
+    protected TransactionLimitService $limitService;
 
-    public function __construct(EscrowService $escrowService)
+    public function __construct(EscrowService $escrowService, TransactionLimitService $limitService)
     {
         $this->escrowService = $escrowService;
+        $this->limitService = $limitService;
     }
 
     /**
@@ -92,6 +94,12 @@ class OrderService
                 throw new \Exception('Buyer does not have a wallet');
             }
 
+            // ✅ NEW: Check transaction limits
+            $limitCheck = $this->limitService->canTransact($buyer, $order->price);
+            if (!$limitCheck['allowed']) {
+                throw new \Exception($limitCheck['message']);
+            }
+
             // Check balance
             if (!$this->escrowService->hasSufficientBalance($buyer->wallet, $order->price)) {
                 throw new \Exception('Insufficient wallet balance');
@@ -123,9 +131,10 @@ class OrderService
             );
 
             DB::commit();
+            
             // Send email notifications
-$order->seller->notify(new \App\Notifications\OrderPurchasedNotification($order, 'seller'));
-$order->buyer->notify(new \App\Notifications\OrderPurchasedNotification($order, 'buyer'));
+            $order->seller->notify(new \App\Notifications\OrderPurchasedNotification($order, 'seller'));
+            $order->buyer->notify(new \App\Notifications\OrderPurchasedNotification($order, 'buyer'));
 
             return $order->fresh();
         } catch (\Exception $e) {
@@ -189,10 +198,11 @@ $order->buyer->notify(new \App\Notifications\OrderPurchasedNotification($order, 
                 ]
             );
 
-            DB::commit();// Send email notifications
-$order->seller->notify(new \App\Notifications\OrderPurchasedNotification($order, 'seller'));
-$order->buyer->notify(new \App\Notifications\OrderPurchasedNotification($order, 'buyer'));
-
+            DB::commit();
+            
+            // Send email notifications
+            $order->seller->notify(new \App\Notifications\OrderPurchasedNotification($order, 'seller'));
+            $order->buyer->notify(new \App\Notifications\OrderPurchasedNotification($order, 'buyer'));
 
             return $order->fresh();
         } catch (\Exception $e) {
@@ -288,68 +298,68 @@ $order->buyer->notify(new \App\Notifications\OrderPurchasedNotification($order, 
      * Raise a dispute for an order
      */
     public function raiseDispute(Order $order, User $user, string $reason): Dispute
-{
-    DB::beginTransaction();
+    {
+        DB::beginTransaction();
 
-    try {
-        if (!$order->canBeDisputed()) {
-            throw new \Exception('Order cannot be disputed');
-        }
+        try {
+            if (!$order->canBeDisputed()) {
+                throw new \Exception('Order cannot be disputed');
+            }
 
-        // Validate user is buyer or seller
-        if ($order->buyer_id !== $user->id && $order->seller_id !== $user->id) {
-            throw new \Exception('Only buyer or seller can raise dispute');
-        }
+            // Validate user is buyer or seller
+            if ($order->buyer_id !== $user->id && $order->seller_id !== $user->id) {
+                throw new \Exception('Only buyer or seller can raise dispute');
+            }
 
-        // Create dispute
-        $dispute = Dispute::create([
-            'order_id' => $order->id,
-            'raised_by_user_id' => $user->id,
-            'dispute_reason' => $reason,
-            'dispute_status' => 'OPEN',
-        ]);
-
-        // Update order status
-        $order->update(['order_status' => 'DISPUTED']);
-
-        // Audit log
-        AuditService::log(
-            'dispute.raised',
-            "Dispute raised for order #{$order->id}",
-            $dispute,
-            [],
-            ['dispute_id' => $dispute->id, 'order_status' => 'DISPUTED'],
-            [
+            // Create dispute
+            $dispute = Dispute::create([
                 'order_id' => $order->id,
-                'raised_by' => $user->id,
-                'reason' => $reason,
-            ]
-        );
+                'raised_by_user_id' => $user->id,
+                'dispute_reason' => $reason,
+                'dispute_status' => 'OPEN',
+            ]);
 
-        DB::commit();
+            // Update order status
+            $order->update(['order_status' => 'DISPUTED']);
 
-        // Send email notifications
-$order->seller->notify(new \App\Notifications\OrderPurchasedNotification($order, 'seller'));
-$order->buyer->notify(new \App\Notifications\OrderPurchasedNotification($order, 'buyer'));
+            // Audit log
+            AuditService::log(
+                'dispute.raised',
+                "Dispute raised for order #{$order->id}",
+                $dispute,
+                [],
+                ['dispute_id' => $dispute->id, 'order_status' => 'DISPUTED'],
+                [
+                    'order_id' => $order->id,
+                    'raised_by' => $user->id,
+                    'reason' => $reason,
+                ]
+            );
 
-        // Load relationships with correct column names
-        return $dispute->load([
-            'order',
-            'raisedBy:id,full_name,email'  // FIXED: full_name instead of name
-        ]);
-    } catch (\Exception $e) {
-        DB::rollBack();
+            DB::commit();
 
-        AuditService::logFailure(
-            'dispute.raise_failed',
-            "Failed to raise dispute for order #{$order->id}",
-            $e->getMessage(),
-            ['order_id' => $order->id, 'user_id' => $user->id]
-        );
+            // Send email notifications
+            $order->seller->notify(new \App\Notifications\OrderPurchasedNotification($order, 'seller'));
+            $order->buyer->notify(new \App\Notifications\OrderPurchasedNotification($order, 'buyer'));
 
-        throw $e;
+            // Load relationships with correct column names
+            return $dispute->load([
+                'order',
+                'raisedBy:id,full_name,email'
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            AuditService::logFailure(
+                'dispute.raise_failed',
+                "Failed to raise dispute for order #{$order->id}",
+                $e->getMessage(),
+                ['order_id' => $order->id, 'user_id' => $user->id]
+            );
+
+            throw $e;
+        }
     }
-}
 
     /**
      * Update an order
@@ -394,62 +404,62 @@ $order->buyer->notify(new \App\Notifications\OrderPurchasedNotification($order, 
     }
 
     /**
- * Auto-complete order after X days (system action)
- */
-public function autoCompleteOrder(Order $order): Order
-{
-    DB::beginTransaction();
+     * Auto-complete order after X days (system action)
+     */
+    public function autoCompleteOrder(Order $order): Order
+    {
+        DB::beginTransaction();
 
-    try {
-        if (!$order->isInEscrow()) {
-            throw new \Exception('Order is not in escrow');
+        try {
+            if (!$order->isInEscrow()) {
+                throw new \Exception('Order is not in escrow');
+            }
+
+            $escrowLock = $order->escrowLock;
+
+            if (!$escrowLock) {
+                throw new \Exception('Escrow lock not found');
+            }
+
+            $autoCompleteDays = config('escrow.auto_complete_days', 7);
+
+            // Release funds to seller
+            $this->escrowService->releaseFunds($order, $escrowLock);
+
+            // Update order
+            $order->update([
+                'order_status' => 'COMPLETED',
+                'completed_at' => now(),
+            ]);
+
+            // Audit log
+            AuditService::log(
+                'order.auto_completed',
+                "Order #{$order->id} auto-completed after {$autoCompleteDays} days",
+                $order,
+                ['status' => 'IN_ESCROW'],
+                ['status' => 'COMPLETED'],
+                [
+                    'order_id' => $order->id,
+                    'reason' => 'Auto-completed by system',
+                    'days_in_escrow' => $autoCompleteDays,
+                ]
+            );
+
+            DB::commit();
+
+            return $order->fresh();
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            AuditService::logFailure(
+                'order.auto_complete_failed',
+                "Failed to auto-complete order #{$order->id}",
+                $e->getMessage(),
+                ['order_id' => $order->id]
+            );
+
+            throw $e;
         }
-
-        $escrowLock = $order->escrowLock;
-
-        if (!$escrowLock) {
-            throw new \Exception('Escrow lock not found');
-        }
-
-        $autoCompleteDays = config('escrow.auto_complete_days', 7);
-
-        // Release funds to seller
-        $this->escrowService->releaseFunds($order, $escrowLock);
-
-        // Update order
-        $order->update([
-            'order_status' => 'COMPLETED',
-            'completed_at' => now(),
-        ]);
-
-        // Audit log
-        AuditService::log(
-            'order.auto_completed',
-            "Order #{$order->id} auto-completed after {$autoCompleteDays} days",
-            $order,
-            ['status' => 'IN_ESCROW'],
-            ['status' => 'COMPLETED'],
-            [
-                'order_id' => $order->id,
-                'reason' => 'Auto-completed by system',
-                'days_in_escrow' => $autoCompleteDays,
-            ]
-        );
-
-        DB::commit();
-
-        return $order->fresh();
-    } catch (\Exception $e) {
-        DB::rollBack();
-
-        AuditService::logFailure(
-            'order.auto_complete_failed',
-            "Failed to auto-complete order #{$order->id}",
-            $e->getMessage(),
-            ['order_id' => $order->id]
-        );
-
-        throw $e;
     }
-}
 }
