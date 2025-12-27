@@ -320,3 +320,10 @@ Route::middleware('auth:sanctum')->group(function () {
 // Public payment link routes (no auth required for viewing/paying)
 Route::get('/pay/{slug}', [App\Http\Controllers\Api\PaymentLinkController::class, 'show']);
 Route::post('/pay/{slug}', [App\Http\Controllers\Api\PaymentLinkController::class, 'pay'])->middleware('auth:sanctum');
+
+// KYC Verification
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/kyc/verify-nin', [App\Http\Controllers\Api\KYCController::class, 'verifyNIN']);
+    Route::get('/kyc/nin-status', [App\Http\Controllers\Api\KYCController::class, 'getNINStatus']);
+    Route::get('/kyc/status', [App\Http\Controllers\Api\KYCController::class, 'getKYCStatus']);
+});
