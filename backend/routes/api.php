@@ -307,3 +307,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/withdrawals', [App\Http\Controllers\Api\WithdrawalController::class, 'store']);
     Route::post('/withdrawals/{id}/cancel', [App\Http\Controllers\Api\WithdrawalController::class, 'cancel']);
 });
+
+// Payment Links
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/payment-links', [App\Http\Controllers\Api\PaymentLinkController::class, 'index']);
+    Route::post('/payment-links', [App\Http\Controllers\Api\PaymentLinkController::class, 'store']);
+    Route::put('/payment-links/{id}', [App\Http\Controllers\Api\PaymentLinkController::class, 'update']);
+    Route::delete('/payment-links/{id}', [App\Http\Controllers\Api\PaymentLinkController::class, 'destroy']);
+    Route::get('/payment-links/{id}/stats', [App\Http\Controllers\Api\PaymentLinkController::class, 'stats']);
+});
+
+// Public payment link routes (no auth required for viewing/paying)
+Route::get('/pay/{slug}', [App\Http\Controllers\Api\PaymentLinkController::class, 'show']);
+Route::post('/pay/{slug}', [App\Http\Controllers\Api\PaymentLinkController::class, 'pay'])->middleware('auth:sanctum');
