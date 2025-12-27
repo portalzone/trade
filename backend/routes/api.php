@@ -260,3 +260,16 @@ Route::get("/test-termii", function() {
         "channel" => config("termii.channel"),
     ]);
 });
+// Waybills
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/orders/{orderId}/waybill', [App\Http\Controllers\Api\WaybillController::class, 'generate']);
+    Route::get('/orders/{orderId}/waybill', [App\Http\Controllers\Api\WaybillController::class, 'show']);
+    Route::get('/orders/{orderId}/waybill/pdf', [App\Http\Controllers\Api\WaybillController::class, 'viewPDF']);
+    Route::get('/orders/{orderId}/waybill/download', [App\Http\Controllers\Api\WaybillController::class, 'downloadPDF']);
+});
+
+// Test waybill PDF (temporary - for testing)
+Route::get('/test-waybill-pdf/{orderId}', function($orderId) {
+    $waybill = \App\Models\Waybill::where('order_id', $orderId)->firstOrFail();
+    return app(\App\Services\WaybillService::class)->streamPDF($waybill);
+});
