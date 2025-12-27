@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\WebhookController;
 use App\Http\Controllers\Api\AuditController;
+use App\Http\Controllers\Api\OtpController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\Admin\DisputeController;
 
@@ -264,4 +265,17 @@ Route::get('/test-email', function () {
             'error' => $e->getMessage()
         ], 500);
     }
+});
+
+// OTP endpoints (public)
+Route::post("/otp/send", [App\Http\Controllers\Api\OtpController::class, "sendOtp"]);
+Route::post("/otp/verify", [App\Http\Controllers\Api\OtpController::class, "verifyOtp"]);
+
+// Test Termii config
+Route::get("/test-termii", function() {
+    return response()->json([
+        "api_key" => config("termii.api_key"),
+        "sender_id" => config("termii.sender_id"),
+        "channel" => config("termii.channel"),
+    ]);
 });
