@@ -280,3 +280,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/disputes/{disputeId}/evidence', [App\Http\Controllers\Api\EvidenceController::class, 'index']);
     Route::delete('/disputes/{disputeId}/evidence/{evidenceId}', [App\Http\Controllers\Api\EvidenceController::class, 'destroy']);
 });
+
+// Business Verification (Tier 2/3)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/business/verify/tier2', [App\Http\Controllers\Api\BusinessVerificationController::class, 'submitTier2']);
+    Route::get('/business/verification/status', [App\Http\Controllers\Api\BusinessVerificationController::class, 'getStatus']);
+});
