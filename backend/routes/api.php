@@ -273,3 +273,10 @@ Route::get('/test-waybill-pdf/{orderId}', function($orderId) {
     $waybill = \App\Models\Waybill::where('order_id', $orderId)->firstOrFail();
     return app(\App\Services\WaybillService::class)->streamPDF($waybill);
 });
+
+// Evidence Upload
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/disputes/{disputeId}/evidence', [App\Http\Controllers\Api\EvidenceController::class, 'upload']);
+    Route::get('/disputes/{disputeId}/evidence', [App\Http\Controllers\Api\EvidenceController::class, 'index']);
+    Route::delete('/disputes/{disputeId}/evidence/{evidenceId}', [App\Http\Controllers\Api\EvidenceController::class, 'destroy']);
+});
