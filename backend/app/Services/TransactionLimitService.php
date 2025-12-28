@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\Order;
 use App\Models\UserTransactionLimit;
+use App\Models\TransactionLimit;
 use Carbon\Carbon;
 
 class TransactionLimitService
@@ -63,19 +64,75 @@ class TransactionLimitService
     }
 
     /**
-     * Get user's transaction limits
+     * Get user's transaction limits (auto-create from tier defaults)
      */
     public function getUserLimits(User $user): UserTransactionLimit
     {
-        return UserTransactionLimit::firstOrCreate(
-            ['user_id' => $user->id],
-            [
-                'tier' => 'tier1',
-                'per_transaction_limit' => 100000,
-                'daily_limit' => 200000,
-                'monthly_limit' => 500000,
-            ]
-        );
+        $userLimit = UserTransactionLimit::where('user_id', $user->id)->first();
+
+        // If user has limits, check if tier matches current user tier
+        if ($userLimit) {
+            $expectedTier = 'tier' . $user->kyc_tier;
+            
+            // If tier doesn't match, upgrade limits
+            if ($userLimit->tier !== $expectedTier) {
+                $this->upgradeLimits($user);
+                $userLimit = $userLimit->fresh();
+            }
+            
+            return $userLimit;
+        }
+
+        // Create new limits from tier defaults
+        return $this->createLimitsFromTier($user);
+    }
+
+    /**
+     * Create user limits from tier defaults
+     */
+    protected function createLimitsFromTier(User $user): UserTransactionLimit
+    {
+        $tierDefaults = TransactionLimit::getForTier($user->kyc_tier);
+
+        if (!$tierDefaults) {
+            // Fallback to tier 1 if tier defaults not found
+            $tierDefaults = TransactionLimit::getForTier(1);
+        }
+
+        return UserTransactionLimit::create([
+            'user_id' => $user->id,
+            'tier' => 'tier' . $user->kyc_tier,
+            'per_transaction_limit' => $tierDefaults->per_transaction_limit,
+            'daily_limit' => $tierDefaults->daily_limit,
+            'monthly_limit' => $tierDefaults->monthly_limit,
+        ]);
+    }
+
+    /**
+     * Upgrade user limits when tier changes
+     */
+    public function upgradeLimits(User $user): UserTransactionLimit
+    {
+        $tierDefaults = TransactionLimit::getForTier($user->kyc_tier);
+
+        if (!$tierDefaults) {
+            throw new \Exception("Tier {$user->kyc_tier} limits not found");
+        }
+
+        $userLimit = UserTransactionLimit::where('user_id', $user->id)->first();
+
+        if (!$userLimit) {
+            return $this->createLimitsFromTier($user);
+        }
+
+        $userLimit->update([
+            'tier' => 'tier' . $user->kyc_tier,
+            'per_transaction_limit' => $tierDefaults->per_transaction_limit,
+            'daily_limit' => $tierDefaults->daily_limit,
+            'monthly_limit' => $tierDefaults->monthly_limit,
+        ]);
+
+        return $userLimit->fresh();
     }
 
     /**
@@ -112,6 +169,7 @@ class TransactionLimitService
 
         return [
             'tier' => $limits->tier,
+            'kyc_tier' => $user->kyc_tier,
             'limits' => [
                 'per_transaction' => $limits->per_transaction_limit,
                 'daily' => $limits->daily_limit,
@@ -121,12 +179,12 @@ class TransactionLimitService
                 'daily' => [
                     'spent' => $dailySpent,
                     'remaining' => max(0, $limits->daily_limit - $dailySpent),
-                    'percentage' => min(100, ($dailySpent / $limits->daily_limit) * 100),
+                    'percentage' => $limits->daily_limit > 0 ? min(100, ($dailySpent / $limits->daily_limit) * 100) : 0,
                 ],
                 'monthly' => [
                     'spent' => $monthlySpent,
                     'remaining' => max(0, $limits->monthly_limit - $monthlySpent),
-                    'percentage' => min(100, ($monthlySpent / $limits->monthly_limit) * 100),
+                    'percentage' => $limits->monthly_limit > 0 ? min(100, ($monthlySpent / $limits->monthly_limit) * 100) : 0,
                 ],
             ],
         ];
