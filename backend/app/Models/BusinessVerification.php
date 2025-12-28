@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class BusinessVerification extends Model
 {
@@ -27,6 +28,12 @@ class BusinessVerification extends Model
         'tin_certificate_path',
         'tin_certificate_url',
         'additional_documents',
+        'total_ownership_declared',
+        'all_ubos_identified',
+        'sanctions_screening_completed',
+        'edd_completed',
+        'edd_started_at',
+        'edd_completed_at',
         'verification_status',
         'rejection_reason',
         'verification_notes',
@@ -40,6 +47,11 @@ class BusinessVerification extends Model
         'additional_documents' => 'array',
         'verification_notes' => 'array',
         'registration_date' => 'date',
+        'all_ubos_identified' => 'boolean',
+        'sanctions_screening_completed' => 'boolean',
+        'edd_completed' => 'boolean',
+        'edd_started_at' => 'datetime',
+        'edd_completed_at' => 'datetime',
         'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',
         'verified_at' => 'datetime',
@@ -58,6 +70,21 @@ class BusinessVerification extends Model
     public function directors(): HasMany
     {
         return $this->hasMany(BusinessDirector::class);
+    }
+
+    public function beneficialOwners(): HasMany
+    {
+        return $this->hasMany(BeneficialOwner::class);
+    }
+
+    public function sanctionsScreenings(): HasMany
+    {
+        return $this->hasMany(SanctionsScreeningResult::class);
+    }
+
+    public function eddReview(): HasOne
+    {
+        return $this->hasOne(EddReview::class);
     }
 
     /**
@@ -85,6 +112,29 @@ class BusinessVerification extends Model
     }
 
     /**
+     * Check if Tier 3 verification
+     */
+    public function isTier3(): bool
+    {
+        return $this->tier === 'tier3';
+    }
+
+    /**
+     * Check if ready for Tier 3 verification
+     */
+    public function isReadyForTier3Verification(): bool
+    {
+        if (!$this->isTier3()) {
+            return false;
+        }
+
+        return $this->all_ubos_identified
+            && $this->sanctions_screening_completed
+            && $this->edd_completed
+            && $this->total_ownership_declared >= 100;
+    }
+
+    /**
      * Mark as submitted
      */
     public function markAsSubmitted(): void
@@ -108,8 +158,9 @@ class BusinessVerification extends Model
         ]);
 
         // Upgrade user tier
+        $tier = $this->tier === 'tier3' ? 3 : 2;
         $this->user->update([
-            'kyc_tier' => $this->tier === 'tier3' ? 3 : 2,
+            'kyc_tier' => $tier,
         ]);
     }
 
