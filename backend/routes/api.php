@@ -295,3 +295,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/business/directors/{id}', [App\Http\Controllers\Api\BusinessDirectorController::class, 'destroy']);
     Route::post('/business/directors/{id}/document', [App\Http\Controllers\Api\BusinessDirectorController::class, 'uploadDocument']);
 });
+
+// Admin Business Verification Management
+Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
+    Route::get('/business/verifications', [App\Http\Controllers\Api\Admin\BusinessVerificationController::class, 'index']);
+    Route::get('/business/verifications/pending', function (Request $request) {
+        $request->merge(['pending' => true]);
+        return app(App\Http\Controllers\Api\Admin\BusinessVerificationController::class)->index($request);
+    });
+    Route::get('/business/verifications/statistics', [App\Http\Controllers\Api\Admin\BusinessVerificationController::class, 'statistics']);
+    Route::get('/business/verifications/{id}', [App\Http\Controllers\Api\Admin\BusinessVerificationController::class, 'show']);
+    Route::post('/business/verifications/{id}/approve', [App\Http\Controllers\Api\Admin\BusinessVerificationController::class, 'approve']);
+    Route::post('/business/verifications/{id}/reject', [App\Http\Controllers\Api\Admin\BusinessVerificationController::class, 'reject']);
+    Route::post('/business/verifications/{id}/request-info', [App\Http\Controllers\Api\Admin\BusinessVerificationController::class, 'requestInfo']);
+});
