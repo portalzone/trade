@@ -316,3 +316,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/business/tier3/ubo', [App\Http\Controllers\Api\Tier3VerificationController::class, 'addUbo']);
     Route::get('/business/tier3/status', [App\Http\Controllers\Api\Tier3VerificationController::class, 'getStatus']);
 });
+
+// Admin Tier 3 Management
+Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
+    Route::get('/tier3/verifications', [App\Http\Controllers\Api\Admin\Tier3VerificationController::class, 'index']);
+    Route::post('/tier3/verifications/{id}/sanctions-screening', [App\Http\Controllers\Api\Admin\Tier3VerificationController::class, 'runSanctionsScreening']);
+    Route::post('/tier3/sanctions/{resultId}/clear', [App\Http\Controllers\Api\Admin\Tier3VerificationController::class, 'clearSanctionsMatch']);
+    Route::post('/tier3/verifications/{id}/edd/start', [App\Http\Controllers\Api\Admin\Tier3VerificationController::class, 'startEdd']);
+    Route::post('/tier3/verifications/{id}/edd/complete', [App\Http\Controllers\Api\Admin\Tier3VerificationController::class, 'completeEdd']);
+    Route::post('/tier3/verifications/{id}/approve', [App\Http\Controllers\Api\Admin\Tier3VerificationController::class, 'approve']);
+});
