@@ -127,6 +127,14 @@ class User extends Authenticatable
         return $this->hasOne(Rider::class);
     }
 
+    /**
+     * Get user's storefront
+     */
+    public function storefront()
+    {
+        return $this->hasOne(\App\Models\Storefront::class);
+    }
+
     // ============================================
     // SCOPES
     // ============================================

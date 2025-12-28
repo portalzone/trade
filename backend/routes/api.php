@@ -326,3 +326,14 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::post('/tier3/verifications/{id}/edd/complete', [App\Http\Controllers\Api\Admin\Tier3VerificationController::class, 'completeEdd']);
     Route::post('/tier3/verifications/{id}/approve', [App\Http\Controllers\Api\Admin\Tier3VerificationController::class, 'approve']);
 });
+
+// Storefronts
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/storefront', [App\Http\Controllers\Api\StorefrontController::class, 'create']);
+    Route::get('/storefront/my', [App\Http\Controllers\Api\StorefrontController::class, 'getMy']);
+    Route::put('/storefront', [App\Http\Controllers\Api\StorefrontController::class, 'update']);
+    Route::get('/storefront/stats', [App\Http\Controllers\Api\StorefrontController::class, 'getStats']);
+});
+
+// Public storefront access
+Route::get('/store/{slug}', [App\Http\Controllers\Api\StorefrontController::class, 'show']);
