@@ -337,3 +337,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Public storefront access
 Route::get('/store/{slug}', [App\Http\Controllers\Api\StorefrontController::class, 'show']);
+
+// Products
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/products', [App\Http\Controllers\Api\ProductController::class, 'create']);
+    Route::get('/products/my', [App\Http\Controllers\Api\ProductController::class, 'getMyProducts']);
+    Route::get('/products/{id}', [App\Http\Controllers\Api\ProductController::class, 'show']);
+    Route::put('/products/{id}', [App\Http\Controllers\Api\ProductController::class, 'update']);
+    Route::delete('/products/{id}', [App\Http\Controllers\Api\ProductController::class, 'delete']);
+});
+
+// Public product endpoints
+Route::get('/store/{slug}/products', [App\Http\Controllers\Api\ProductController::class, 'getStorefrontProducts']);
