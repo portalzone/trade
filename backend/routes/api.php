@@ -309,3 +309,10 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::post('/business/verifications/{id}/reject', [App\Http\Controllers\Api\Admin\BusinessVerificationController::class, 'reject']);
     Route::post('/business/verifications/{id}/request-info', [App\Http\Controllers\Api\Admin\BusinessVerificationController::class, 'requestInfo']);
 });
+
+// Tier 3 Enterprise KYC
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/business/verify/tier3', [App\Http\Controllers\Api\Tier3VerificationController::class, 'submitTier3']);
+    Route::post('/business/tier3/ubo', [App\Http\Controllers\Api\Tier3VerificationController::class, 'addUbo']);
+    Route::get('/business/tier3/status', [App\Http\Controllers\Api\Tier3VerificationController::class, 'getStatus']);
+});
