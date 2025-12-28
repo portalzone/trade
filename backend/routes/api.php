@@ -286,3 +286,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/business/verify/tier2', [App\Http\Controllers\Api\BusinessVerificationController::class, 'submitTier2']);
     Route::get('/business/verification/status', [App\Http\Controllers\Api\BusinessVerificationController::class, 'getStatus']);
 });
+
+// Business Directors Management
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/business/directors', [App\Http\Controllers\Api\BusinessDirectorController::class, 'index']);
+    Route::post('/business/directors', [App\Http\Controllers\Api\BusinessDirectorController::class, 'store']);
+    Route::put('/business/directors/{id}', [App\Http\Controllers\Api\BusinessDirectorController::class, 'update']);
+    Route::delete('/business/directors/{id}', [App\Http\Controllers\Api\BusinessDirectorController::class, 'destroy']);
+    Route::post('/business/directors/{id}/document', [App\Http\Controllers\Api\BusinessDirectorController::class, 'uploadDocument']);
+});
