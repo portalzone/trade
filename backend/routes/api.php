@@ -400,3 +400,15 @@ Route::get('/top-rated', [App\Http\Controllers\Api\UserFeaturesController::class
 
 // Product Comparison
 Route::post('/compare', [App\Http\Controllers\Api\UserFeaturesController::class, 'compareProducts']);
+
+// Bulk Operations (Seller Only)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/bulk/update', [App\Http\Controllers\Api\BulkOperationsController::class, 'bulkUpdate']);
+    Route::post('/bulk/toggle-status', [App\Http\Controllers\Api\BulkOperationsController::class, 'bulkToggleStatus']);
+    Route::post('/bulk/price-adjustment', [App\Http\Controllers\Api\BulkOperationsController::class, 'bulkPriceAdjustment']);
+    Route::post('/bulk/delete', [App\Http\Controllers\Api\BulkOperationsController::class, 'bulkDelete']);
+    Route::get('/bulk/export-csv', [App\Http\Controllers\Api\BulkOperationsController::class, 'exportCSV']);
+    Route::post('/bulk/import-csv', [App\Http\Controllers\Api\BulkOperationsController::class, 'importCSV']);
+    Route::get('/inventory/low-stock', [App\Http\Controllers\Api\BulkOperationsController::class, 'getLowStockAlerts']);
+    Route::get('/inventory/out-of-stock', [App\Http\Controllers\Api\BulkOperationsController::class, 'getOutOfStock']);
+});
