@@ -361,3 +361,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Public category endpoints
 Route::get('/store/{slug}/categories', [App\Http\Controllers\Api\CategoryController::class, 'getStorefrontCategories']);
+
+// Reviews
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/products/{productId}/reviews', [App\Http\Controllers\Api\ReviewController::class, 'create']);
+    Route::get('/reviews/my', [App\Http\Controllers\Api\ReviewController::class, 'getMyReviews']);
+    Route::put('/reviews/{id}', [App\Http\Controllers\Api\ReviewController::class, 'update']);
+    Route::delete('/reviews/{id}', [App\Http\Controllers\Api\ReviewController::class, 'delete']);
+    Route::post('/reviews/{id}/vote', [App\Http\Controllers\Api\ReviewController::class, 'vote']);
+    Route::post('/reviews/{id}/seller-response', [App\Http\Controllers\Api\ReviewController::class, 'addSellerResponse']);
+});
+
+// Public review endpoints
+Route::get('/products/{productId}/reviews', [App\Http\Controllers\Api\ReviewController::class, 'getProductReviews']);
+Route::get('/products/{productId}/reviews/breakdown', [App\Http\Controllers\Api\ReviewController::class, 'getRatingBreakdown']);

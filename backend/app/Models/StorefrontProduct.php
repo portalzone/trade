@@ -69,7 +69,6 @@ class StorefrontProduct extends Model
     {
         parent::boot();
 
-        // Auto-generate slug and SKU
         static::creating(function ($product) {
             if (empty($product->slug)) {
                 $product->slug = Str::slug($product->name);
@@ -79,12 +78,10 @@ class StorefrontProduct extends Model
                 $product->sku = 'PRD-' . strtoupper(Str::random(8));
             }
 
-            // Set published_at if active
             if ($product->is_active && empty($product->published_at)) {
                 $product->published_at = now();
             }
 
-            // Update stock status
             $product->updateStockStatus();
         });
 
@@ -101,6 +98,24 @@ class StorefrontProduct extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(ProductCategory::class);
+    }
+
+    /**
+     * Get product reviews
+     */
+    public function reviews()
+    {
+        return $this->hasMany(ProductReview::class, 'product_id');
+    }
+
+    /**
+     * Get approved reviews only
+     */
+    public function approvedReviews()
+    {
+        return $this->hasMany(ProductReview::class, 'product_id')
+            ->where('is_approved', true)
+            ->orderBy('created_at', 'desc');
     }
 
     /**
@@ -178,5 +193,21 @@ class StorefrontProduct extends Model
             $this->updateStockStatus();
             $this->save();
         }
+    }
+
+    /**
+     * Recalculate average rating
+     */
+    public function recalculateRating(): void
+    {
+        $stats = $this->reviews()
+            ->where('is_approved', true)
+            ->selectRaw('AVG(rating) as avg_rating, COUNT(*) as total_reviews')
+            ->first();
+
+        $this->update([
+            'average_rating' => $stats->avg_rating ?? 0,
+            'reviews_count' => $stats->total_reviews ?? 0,
+        ]);
     }
 }
