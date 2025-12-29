@@ -1,325 +1,267 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useAuthStore } from '@/store/authStore';
+import { useCartStore } from '@/store/cartStore';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
+import { 
+  Package,
+  Star,
+  Store,
+  ShoppingCart,
+  ArrowLeft,
+  Check,
+  Shield
+} from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 
-interface Order {
+interface Product {
   id: number;
-  seller_id: number;
-  buyer_id: number | null;
-  title: string;
+  name: string;
+  slug: string;
   description: string;
   price: string;
-  currency: string;
-  order_status: string;
-  created_at: string;
-  seller: {
+  stock_quantity: number;
+  is_active: boolean;
+  average_rating: string;
+  total_reviews: number;
+  seller_id: number;
+  storefront: {
     id: number;
-    full_name: string;
-    email: string;
+    name: string;
+    slug: string;
+    is_verified: boolean;
   };
 }
 
-export default function OrderDetailsPage() {
-  const router = useRouter();
+export default function ProductDetailsPage() {
   const params = useParams();
-  const orderId = params.id;
-
-  const [order, setOrder] = useState<Order | null>(null);
+  const router = useRouter();
+  const { user } = useAuthStore();
+  const addItem = useCartStore((state) => state.addItem);
+  const cartItems = useCartStore((state) => state.items);
+  const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    const user = localStorage.getItem('user');
-    
-    if (!token) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !user) {
       router.push('/login');
       return;
     }
-
-    if (user) {
-      setCurrentUser(JSON.parse(user));
+    if (mounted && params.id) {
+      fetchProduct();
     }
+  }, [mounted, params.id, user]);
 
-    fetchOrder(token);
-  }, [orderId, router]);
-
-  const fetchOrder = async (token: string) => {
+  const fetchProduct = async () => {
+    setIsLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/orders/${orderId}`, {
+      const token = localStorage.getItem('auth_token');
+      
+      const response = await fetch(`http://localhost:8000/api/products/${params.id}`, {
         headers: {
-          'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
 
       const data = await response.json();
-
-      if (data.success) {
-        setOrder(data.data.order);
+      
+      if (data.success && data.data) {
+        setProduct(data.data);
       } else {
-        setError(data.error || 'Order not found');
+        toast.error('Product not found');
+        router.push('/marketplace');
       }
     } catch (error) {
-      setError('Failed to load order');
-      console.error('Fetch error:', error);
+      console.error('Error fetching product:', error);
+      toast.error('Failed to load product');
+      router.push('/marketplace');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handlePurchase = async () => {
-    if (!confirm('Confirm purchase? Payment will be held in escrow until you confirm delivery.')) {
+  const handleAddToCart = () => {
+    if (!product) {
+      console.error('No product data!');
       return;
     }
 
-    setIsProcessing(true);
-    setMessage('');
+    const cartItem = {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: quantity,
+      stock_quantity: product.stock_quantity,
+      seller_id: product.seller_id,
+      seller_name: product.storefront.name,
+      slug: product.slug,
+    };
 
-    const token = localStorage.getItem('auth_token');
+    console.log('Adding to cart:', cartItem);
+    console.log('Current cart before add:', cartItems);
 
-    try {
-      const response = await fetch(`http://localhost:8000/api/orders/${orderId}/purchase`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+    addItem(cartItem);
 
-      const data = await response.json();
+    // Check cart after adding
+    setTimeout(() => {
+      const updatedCart = useCartStore.getState().items;
+      console.log('Cart after add:', updatedCart);
+      console.log('LocalStorage after add:', localStorage.getItem('cart-storage'));
+    }, 100);
 
-      if (data.success) {
-        setMessage('✅ Purchase successful! Payment locked in escrow.');
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        setMessage('❌ ' + (data.error || data.message || 'Purchase failed'));
-      }
-    } catch (error) {
-      setMessage('❌ Connection error');
-      console.error('Purchase error:', error);
-    } finally {
-      setIsProcessing(false);
-    }
+    toast.success(`${quantity} ${product.name} added to cart! 🛒`);
+    setQuantity(1);
   };
 
-  const handleComplete = async () => {
-    if (!confirm('Confirm delivery received? This will release payment to the seller.')) {
-      return;
-    }
-
-    setIsProcessing(true);
-    setMessage('');
-
-    const token = localStorage.getItem('auth_token');
-
-    try {
-      const response = await fetch(`http://localhost:8000/api/orders/${orderId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage('✅ Order completed! Payment released to seller.');
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        setMessage('❌ ' + (data.error || data.message || 'Failed to complete order'));
-      }
-    } catch (error) {
-      setMessage('❌ Connection error');
-      console.error('Complete error:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleDispute = async () => {
-    const reason = prompt('Please describe the issue with this order:');
-    
-    if (!reason || reason.trim() === '') {
-      return;
-    }
-
-    setIsProcessing(true);
-    setMessage('');
-
-    const token = localStorage.getItem('auth_token');
-
-    try {
-      const response = await fetch(`http://localhost:8000/api/orders/${orderId}/dispute`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ reason: reason.trim() }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage('✅ Dispute raised successfully. Admin will review.');
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        setMessage('❌ ' + (data.error || data.message || 'Failed to raise dispute'));
-      }
-    } catch (error) {
-      setMessage('❌ Connection error');
-      console.error('Dispute error:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  if (isLoading) {
+  if (!mounted || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading order...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <Spinner size="lg" />
       </div>
     );
   }
 
-  if (error || !order) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md text-center">
-          <p className="text-red-800 mb-4">❌ {error || 'Order not found'}</p>
-          <Link href="/marketplace" className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
-            Back to Marketplace
-          </Link>
-        </div>
-      </div>
-    );
+  if (!product) {
+    return null;
   }
 
-  const isSeller = currentUser?.id === order.seller_id;
-  const isBuyer = currentUser?.id === order.buyer_id;
-  const canPurchase = !isSeller && order.order_status === 'ACTIVE' && !order.buyer_id;
-  const canComplete = isBuyer && (order.order_status === 'IN_ESCROW' || order.order_status === 'PURCHASED');
-  const canDispute = isBuyer && (order.order_status === 'IN_ESCROW' || order.order_status === 'PURCHASED');
+  const isOutOfStock = product.stock_quantity === 0;
+  const canAddToCart = !isOutOfStock && quantity <= product.stock_quantity;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="mb-6">
-          <Link href="/marketplace" className="text-blue-600 hover:underline">
-            ← Back to Marketplace
-          </Link>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8 px-4">
+      <div className="max-w-7xl mx-auto">
+        <Link href="/marketplace">
+          <button className="mb-6 flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition">
+            <ArrowLeft className="h-5 w-5" />
+            <span>Back to Marketplace</span>
+          </button>
+        </Link>
 
-        {message && (
-          <div className={`mb-6 p-4 rounded ${message.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-            {message}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="h-96 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center">
+            <Package className="h-32 w-32 text-gray-400" />
           </div>
-        )}
 
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-8">
-            <div className="flex justify-between items-start">
+          <div>
+            <div className="flex items-start justify-between mb-4">
               <div>
-                <h1 className="text-3xl font-bold mb-2">{order.title}</h1>
-                <p className="text-blue-100">Listed {new Date(order.created_at).toLocaleDateString()}</p>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-1">
+                    <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                    <span className="font-semibold text-gray-900">
+                      {parseFloat(product.average_rating).toFixed(1)}
+                    </span>
+                    <span className="text-gray-600">({product.total_reviews} reviews)</span>
+                  </div>
+                  {isOutOfStock && (
+                    <Badge variant="destructive">Out of Stock</Badge>
+                  )}
+                </div>
               </div>
-              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${order.order_status === 'ACTIVE' ? 'bg-green-500' : order.order_status === 'IN_ESCROW' ? 'bg-yellow-500' : order.order_status === 'COMPLETED' ? 'bg-purple-500' : 'bg-gray-500'}`}>
-                {order.order_status}
-              </span>
             </div>
-          </div>
 
-          <div className="p-8">
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="md:col-span-2 space-y-6">
-                <div>
-                  <h2 className="text-lg font-semibold mb-3">Description</h2>
-                  <p className="text-gray-700">{order.description}</p>
-                </div>
+            <p className="text-4xl font-bold text-gray-900 mb-6">
+              {formatCurrency(product.price)}
+            </p>
 
-                <div className="border-t pt-6">
-                  <h2 className="text-lg font-semibold mb-3">Seller Information</h2>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="font-semibold text-gray-900">{order.seller.full_name}</p>
-                    <p className="text-sm text-gray-600">{order.seller.email}</p>
-                  </div>
-                </div>
+            <Card className="mb-6">
+              <CardContent className="p-6">
+                <h3 className="font-semibold text-gray-900 mb-3">Product Description</h3>
+                <p className="text-gray-700 leading-relaxed">{product.description}</p>
+              </CardContent>
+            </Card>
 
-                {isSeller && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-blue-900 font-semibold">📦 This is your order</p>
-                    <p className="text-sm text-blue-700 mt-1">Buyers can purchase this item. You'll receive payment after delivery confirmation.</p>
-                  </div>
-                )}
-
-                {isBuyer && canComplete && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <p className="text-yellow-900 font-semibold">⏳ Awaiting Delivery Confirmation</p>
-                    <p className="text-sm text-yellow-700 mt-1">Once you receive the item, click "Confirm Delivery" to release payment.</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-6">
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <p className="text-sm text-gray-600 mb-2">Price</p>
-                  <p className="text-4xl font-bold text-blue-600">₦{parseFloat(order.price).toLocaleString()}</p>
-                </div>
-
-                {canPurchase && (
-                  <div className="space-y-4">
-                    <button onClick={handlePurchase} disabled={isProcessing} className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold transition disabled:opacity-50">
-                      {isProcessing ? 'Processing...' : 'Purchase Now'}
-                    </button>
-
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <h3 className="font-semibold text-green-900 mb-2">🔒 Escrow Protection</h3>
-                      <ul className="text-xs text-green-800 space-y-1">
-                        <li>• Payment held securely</li>
-                        <li>• Released after delivery</li>
-                        <li>• Dispute resolution available</li>
-                        <li>• Platform fee: 2.5%</li>
-                      </ul>
+            <Card className="mb-6">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Store className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <p className="font-semibold text-gray-900">{product.storefront.name}</p>
+                      {product.storefront.is_verified && (
+                        <p className="text-sm text-blue-600 flex items-center space-x-1">
+                          <Check className="h-4 w-4" />
+                          <span>Verified Seller</span>
+                        </p>
+                      )}
                     </div>
                   </div>
-                )}
-
-                {canComplete && (
-                  <div className="space-y-3">
-                    <button onClick={handleComplete} disabled={isProcessing} className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold transition disabled:opacity-50">
-                      {isProcessing ? 'Processing...' : '✓ Confirm Delivery'}
+                  <Link href={`/store/${product.storefront.slug}`}>
+                    <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">
+                      View Store
                     </button>
-                    <button onClick={handleDispute} disabled={isProcessing} className="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 font-semibold transition disabled:opacity-50">
-                      {isProcessing ? 'Processing...' : '⚠ Raise Dispute'}
-                    </button>
-                  </div>
-                )}
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
 
-                {isSeller && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <p className="text-sm text-yellow-800">
-                      <strong>Net Amount:</strong><br />₦{(parseFloat(order.price) * 0.975).toLocaleString()}<br />
-                      <span className="text-xs">(After 2.5% fee)</span>
-                    </p>
+            {!isOutOfStock && (
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quantity
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <input
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 1;
+                        setQuantity(Math.max(1, Math.min(val, product.stock_quantity)));
+                      }}
+                      min="1"
+                      max={product.stock_quantity}
+                      className="w-24 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-600">
+                      ({product.stock_quantity} available)
+                    </span>
                   </div>
-                )}
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="space-y-3">
+              <button
+                onClick={handleAddToCart}
+                disabled={!canAddToCart}
+                className="w-full px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                <span>{isOutOfStock ? 'Out of Stock' : 'Add to Cart'}</span>
+              </button>
+
+              <Link href="/cart">
+                <button className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-semibold">
+                  View Cart
+                </button>
+              </Link>
+            </div>
+
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <Shield className="h-5 w-5 text-green-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-green-900 mb-1">Escrow Protection</p>
+                  <p className="text-sm text-green-700">
+                    Your payment is secured in escrow until you confirm delivery
+                  </p>
+                </div>
               </div>
             </div>
           </div>

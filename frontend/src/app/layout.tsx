@@ -1,21 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
+import { ToastProvider } from "@/components/ui/toast-provider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "T-Trade - Secure Marketplace",
-  description: "Buy and sell with escrow protection",
+  title: "T-Trade - Secure P2P Marketplace",
+  description: "Nigeria's premier escrow-protected marketplace",
 };
 
 export default function RootLayout({
@@ -25,9 +19,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Navbar />
-        {children}
+      <body className={inter.className}>
+        <div className="flex flex-col min-h-screen">
+          <Navbar />
+          <main className="flex-1">
+            {children}
+          </main>
+          <Footer />
+        </div>
+        <ToastProvider />
       </body>
     </html>
   );

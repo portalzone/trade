@@ -1,14 +1,31 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, Wallet } from '@/types';
+
+interface User {
+  id: number;
+  email: string;
+  phone_number: string;
+  full_name: string;
+  username: string;
+  user_type: string;
+  kyc_status: string;
+  kyc_tier: number;
+  account_status: string;
+}
+
+interface Wallet {
+  id: number;
+  available_balance: string;
+  locked_escrow_funds: string;
+  total_balance: number;
+  wallet_status: string;
+}
 
 interface AuthState {
   user: User | null;
-  wallet: Wallet | null;
   token: string | null;
-  isAuthenticated: boolean;
-  
-  setAuth: (user: User, wallet: Wallet, token: string) => void;
+  wallet: Wallet | null;
+  setAuth: (user: User, token: string, wallet: Wallet) => void;
   updateWallet: (wallet: Wallet) => void;
   logout: () => void;
 }
@@ -17,22 +34,18 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      wallet: null,
       token: null,
-      isAuthenticated: false,
-
-      setAuth: (user, wallet, token) => {
-        localStorage.setItem('auth_token', token);
-        set({ user, wallet, token, isAuthenticated: true });
+      wallet: null,
+      setAuth: (user, token, wallet) => {
+        set({ user, token, wallet });
       },
-
       updateWallet: (wallet) => {
         set({ wallet });
       },
-
       logout: () => {
         localStorage.removeItem('auth_token');
-        set({ user: null, wallet: null, token: null, isAuthenticated: false });
+        localStorage.removeItem('user');
+        set({ user: null, token: null, wallet: null });
       },
     }),
     {

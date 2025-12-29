@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { ShoppingBag, Mail, Lock, User, Phone, Briefcase } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,14 +22,16 @@ export default function RegisterPage() {
     phone_number: '',
     user_type: 'BUYER' as 'BUYER' | 'SELLER',
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (formData.password !== formData.password_confirmation) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
     setIsLoading(true);
-    setErrors({});
-    setMessage('');
 
     try {
       const response = await fetch('http://localhost:8000/api/auth/register', {
@@ -34,30 +43,25 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Store token
         localStorage.setItem('auth_token', data.data.token);
         localStorage.setItem('user', JSON.stringify(data.data.user));
         
-        setMessage('✅ Registration successful! Redirecting...');
+        toast.success('Account created successfully! Redirecting...');
         
-        // Redirect after 1 second
         setTimeout(() => {
           router.push('/dashboard');
         }, 1000);
       } else {
-        setMessage('❌ ' + (data.error || 'Registration failed'));
-        
-        // Handle validation errors
         if (data.errors) {
-          const formattedErrors: Record<string, string> = {};
-          Object.keys(data.errors).forEach((key) => {
-            formattedErrors[key] = data.errors[key][0];
+          Object.values(data.errors).forEach((error: any) => {
+            toast.error(error[0]);
           });
-          setErrors(formattedErrors);
+        } else {
+          toast.error(data.error || 'Registration failed');
         }
       }
     } catch (error) {
-      setMessage('❌ Connection error. Is the backend running?');
+      toast.error('Connection error. Please check your backend.');
       console.error('Register error:', error);
     } finally {
       setIsLoading(false);
@@ -65,120 +69,197 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-6">Create Account</h1>
-        
-        {message && (
-          <div className={`mb-4 p-3 rounded ${message.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-            {message}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-blue-50 py-12 px-4">
+      <Card className="w-full max-w-2xl shadow-xl">
+        <CardHeader className="space-y-1 text-center">
+          <div className="flex justify-center mb-4">
+            <div className="h-16 w-16 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <ShoppingBag className="h-8 w-8 text-white" />
+            </div>
           </div>
-        )}
+          <CardTitle className="text-3xl font-bold">Create Account</CardTitle>
+          <CardDescription className="text-base">
+            Join T-Trade and start trading securely
+          </CardDescription>
+        </CardHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-            <input 
-              type="text" 
-              value={formData.full_name}
-              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-              placeholder="John Doe"
-              required
-            />
-            {errors.full_name && <p className="mt-1 text-sm text-red-600">{errors.full_name}</p>}
-          </div>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Full Name</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    className="pl-10"
+                    placeholder="John Doe"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-            <input 
-              type="text" 
-              value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-              placeholder="johndoe"
-              required
-            />
-            {errors.username && <p className="mt-1 text-sm text-red-600">{errors.username}</p>}
-          </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Username</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    className="pl-10"
+                    placeholder="johndoe"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input 
-              type="email" 
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-              placeholder="john@example.com"
-              required
-            />
-            {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
-          </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="pl-10"
+                    placeholder="john@example.com"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-            <input 
-              type="tel" 
-              value={formData.phone_number}
-              onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-              placeholder="+2348012345678"
-              required
-            />
-            {errors.phone_number && <p className="mt-1 text-sm text-red-600">{errors.phone_number}</p>}
-          </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Phone Number</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="tel"
+                    value={formData.phone_number}
+                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                    className="pl-10"
+                    placeholder="+2348012345678"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Account Type</label>
-            <select
-              value={formData.user_type}
-              onChange={(e) => setFormData({ ...formData, user_type: e.target.value as 'BUYER' | 'SELLER' })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Account Type</label>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, user_type: 'BUYER' })}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    formData.user_type === 'BUYER'
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  disabled={isLoading}
+                >
+                  <ShoppingBag className={`h-6 w-6 mx-auto mb-2 ${
+                    formData.user_type === 'BUYER' ? 'text-blue-600' : 'text-gray-400'
+                  }`} />
+                  <p className="font-semibold">Buyer</p>
+                  <p className="text-xs text-gray-500">Purchase products</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, user_type: 'SELLER' })}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    formData.user_type === 'SELLER'
+                      ? 'border-purple-600 bg-purple-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  disabled={isLoading}
+                >
+                  <Briefcase className={`h-6 w-6 mx-auto mb-2 ${
+                    formData.user_type === 'SELLER' ? 'text-purple-600' : 'text-gray-400'
+                  }`} />
+                  <p className="font-semibold">Seller</p>
+                  <p className="text-xs text-gray-500">Sell products</p>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="pl-10"
+                    placeholder="••••••••"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Confirm Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="password"
+                    value={formData.password_confirmation}
+                    onChange={(e) => setFormData({ ...formData, password_confirmation: e.target.value })}
+                    className="pl-10"
+                    placeholder="••••••••"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Button 
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-11 text-base font-semibold"
             >
-              <option value="BUYER">Buyer</option>
-              <option value="SELLER">Seller</option>
-            </select>
+              {isLoading ? (
+                <>
+                  <Spinner size="sm" className="mr-2" />
+                  Creating account...
+                </>
+              ) : (
+                'Create Account'
+              )}
+            </Button>
+          </form>
+        </CardContent>
+
+        <CardFooter className="flex flex-col space-y-4">
+          <div className="relative w-full">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-gray-500">Already have an account?</span>
+            </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input 
-              type="password" 
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-              placeholder="••••••••"
-              required
-            />
-            {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-            <input 
-              type="password" 
-              value={formData.password_confirmation}
-              onChange={(e) => setFormData({ ...formData, password_confirmation: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-              placeholder="••••••••"
-              required
-            />
-            {errors.password_confirmation && <p className="mt-1 text-sm text-red-600">{errors.password_confirmation}</p>}
-          </div>
-
-          <button 
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-semibold transition disabled:opacity-50"
-          >
-            {isLoading ? 'Creating Account...' : 'Create Account'}
-          </button>
-        </form>
-
-        <p className="text-center mt-6 text-gray-600">
-          Already have an account? <a href="/login" className="text-blue-600 hover:underline font-semibold">Login</a>
-        </p>
-      </div>
+          
+          <Link href="/login" className="w-full">
+            <Button variant="outline" className="w-full">
+              Login
+            </Button>
+          </Link>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

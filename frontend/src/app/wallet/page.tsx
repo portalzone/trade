@@ -2,191 +2,332 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-
-interface Wallet {
-  id: number;
-  available_balance: string;
-  locked_escrow_funds: string;
-  total_balance: number;
-  wallet_status: string;
-}
+import { useAuthStore } from '@/store/authStore';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
+import { 
+  Wallet, 
+  TrendingUp, 
+  TrendingDown,
+  Lock,
+  Plus,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Download,
+  Filter
+} from 'lucide-react';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 interface Transaction {
   id: number;
-  transaction_type: string;
+  type: string;
   amount: string;
   description: string;
-  created_at: string;
   status: string;
+  created_at: string;
+  reference: string;
 }
 
 export default function WalletPage() {
   const router = useRouter();
-  const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const { user, wallet, updateWallet } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [showBalance, setShowBalance] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    
-    if (!token) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !user) {
       router.push('/login');
-      return;
     }
+  }, [mounted, user, router]);
 
-    fetchWalletData(token);
-  }, [router]);
+  useEffect(() => {
+    if (user) {
+      fetchWalletData();
+    }
+  }, [user]);
 
-  const fetchWalletData = async (token: string) => {
+  const fetchWalletData = async () => {
+    setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/wallet', {
+      const token = localStorage.getItem('auth_token');
+      
+      // Fetch wallet info
+      const walletRes = await fetch('http://localhost:8000/api/wallet', {
         headers: {
-          'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
+      
+      const walletData = await walletRes.json();
+      if (walletData.success) {
+        updateWallet(walletData.data.wallet);
+      }
 
-      const data = await response.json();
-
-      if (data.success) {
-        setWallet(data.data.wallet);
-        setTransactions(data.data.recent_transactions || []);
-      } else {
-        setError(data.error || 'Failed to load wallet');
+      // Fetch transactions
+      const txRes = await fetch('http://localhost:8000/api/wallet/transactions?limit=20', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const txData = await txRes.json();
+      if (txData.success) {
+        setTransactions(txData.data.transactions || []);
       }
     } catch (error) {
-      setError('Connection error');
-      console.error('Fetch error:', error);
+      console.error('Error fetching wallet:', error);
+      toast.error('Failed to load wallet data');
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (isLoading) {
+  if (!mounted || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading wallet...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <Spinner size="lg" />
       </div>
     );
   }
 
-  if (error || !wallet) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <p className="text-red-800">❌ {error || 'Wallet not found'}</p>
-        </div>
-      </div>
-    );
-  }
+  const getTransactionIcon = (type: string) => {
+    if (type.includes('DEPOSIT') || type.includes('CREDIT')) {
+      return <ArrowDownToLine className="h-5 w-5 text-green-600" />;
+    }
+    return <ArrowUpFromLine className="h-5 w-5 text-red-600" />;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      'COMPLETED': 'success',
+      'PENDING': 'warning',
+      'FAILED': 'destructive',
+      'PROCESSING': 'default',
+    } as const;
+    
+    return <Badge variant={variants[status as keyof typeof variants] || 'secondary'}>{status}</Badge>;
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">My Wallet</h1>
-          <p className="text-gray-600 mt-2">Manage your funds and view transactions</p>
-        </div>
-
-        {/* Balance Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg shadow-lg p-6 text-white">
-            <p className="text-blue-100 text-sm mb-2">Available Balance</p>
-            <p className="text-4xl font-bold">₦{parseFloat(wallet.available_balance).toLocaleString()}</p>
-            <p className="text-blue-100 text-xs mt-2">Ready to use</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8 px-4">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center space-x-3">
+              <Wallet className="h-8 w-8 text-blue-600" />
+              <span>My Wallet</span>
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Manage your funds and view transaction history
+            </p>
           </div>
-
-          <div className="bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-lg shadow-lg p-6 text-white">
-            <p className="text-yellow-100 text-sm mb-2">Locked in Escrow</p>
-            <p className="text-4xl font-bold">₦{parseFloat(wallet.locked_escrow_funds).toLocaleString()}</p>
-            <p className="text-yellow-100 text-xs mt-2">Pending orders</p>
-          </div>
-
-          <div className="bg-gradient-to-br from-green-600 to-green-800 rounded-lg shadow-lg p-6 text-white">
-            <p className="text-green-100 text-sm mb-2">Total Balance</p>
-            <p className="text-4xl font-bold">₦{wallet.total_balance.toLocaleString()}</p>
-            <p className="text-green-100 text-xs mt-2">Available + Locked</p>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
-          <div className="grid md:grid-cols-3 gap-4">
-            <Link href="/marketplace" className="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition text-center">
-              <p className="font-semibold text-blue-900">🛍️ Browse Marketplace</p>
-              <p className="text-sm text-blue-700 mt-1">Find items to purchase</p>
-            </Link>
-            <Link href="/orders/create" className="bg-green-50 border border-green-200 rounded-lg p-4 hover:bg-green-100 transition text-center">
-              <p className="font-semibold text-green-900">📦 Create Order</p>
-              <p className="text-sm text-green-700 mt-1">List an item for sale</p>
-            </Link>
-            <button className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 transition text-center opacity-50 cursor-not-allowed">
-              <p className="font-semibold text-gray-900">💳 Add Funds</p>
-              <p className="text-sm text-gray-700 mt-1">Coming soon</p>
+          <div className="mt-4 md:mt-0 flex items-center space-x-3">
+            <button
+              onClick={fetchWalletData}
+              disabled={isLoading}
+              className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition flex items-center space-x-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
             </button>
           </div>
         </div>
 
-        {/* Transaction History */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-bold">Recent Transactions</h2>
-          </div>
+        {/* Balance Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Available Balance */}
+          <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-green-50 to-white hover:shadow-xl transition">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center justify-between">
+                <span>Available Balance</span>
+                <button 
+                  onClick={() => setShowBalance(!showBalance)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  {showBalance ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <p className="text-4xl font-bold text-gray-900">
+                  {showBalance ? formatCurrency(wallet?.available_balance || 0) : '••••••'}
+                </p>
+                <p className="text-sm text-green-600 flex items-center">
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                  Available to spend
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
-          {transactions.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">
-              <p className="text-lg">No transactions yet</p>
-              <p className="text-sm mt-2">Start buying or selling to see your transaction history</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {transactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {new Date(tx.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                          tx.transaction_type === 'CREDIT' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {tx.transaction_type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{tx.description}</td>
-                      <td className="px-6 py-4 text-sm text-right font-semibold">
-                        ₦{parseFloat(tx.amount).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                          tx.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {tx.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {/* Locked Funds */}
+          <Card className="border-l-4 border-l-orange-500 bg-gradient-to-br from-orange-50 to-white hover:shadow-xl transition">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center justify-between">
+                <span>Locked Funds</span>
+                <Lock className="h-5 w-5 text-orange-500" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <p className="text-4xl font-bold text-gray-900">
+                  {showBalance ? formatCurrency(wallet?.locked_escrow_funds || 0) : '••••••'}
+                </p>
+                <p className="text-sm text-orange-600">
+                  In escrow protection
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Total Balance */}
+          <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-white hover:shadow-xl transition">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center justify-between">
+                <span>Total Balance</span>
+                <TrendingUp className="h-5 w-5 text-blue-500" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <p className="text-4xl font-bold text-gray-900">
+                  {showBalance ? formatCurrency(wallet?.total_balance || 0) : '••••••'}
+                </p>
+                <p className="text-sm text-blue-600">
+                  Total wallet value
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button className="p-6 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg hover:shadow-xl group">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="h-12 w-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
+                  <Plus className="h-6 w-6" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-lg">Deposit Funds</p>
+                  <p className="text-sm text-green-100">Add money to your wallet</p>
+                </div>
+              </div>
+              <ArrowDownToLine className="h-6 w-6" />
+            </div>
+          </button>
+
+          <button className="p-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition shadow-lg hover:shadow-xl group">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="h-12 w-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
+                  <ArrowUpFromLine className="h-6 w-6" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-lg">Withdraw Funds</p>
+                  <p className="text-sm text-blue-100">Transfer to your bank</p>
+                </div>
+              </div>
+              <ArrowUpFromLine className="h-6 w-6" />
+            </div>
+          </button>
+        </div>
+
+        {/* Transaction History */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center space-x-2">
+                <RefreshCw className="h-5 w-5 text-gray-600" />
+                <span>Transaction History</span>
+              </CardTitle>
+              <div className="flex items-center space-x-2">
+                <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition flex items-center space-x-1">
+                  <Filter className="h-4 w-4" />
+                  <span>Filter</span>
+                </button>
+                <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition flex items-center space-x-1">
+                  <Download className="h-4 w-4" />
+                  <span>Export</span>
+                </button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="text-center py-12">
+                <Spinner size="lg" />
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="text-center py-12">
+                <Wallet className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 font-medium">No transactions yet</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  Your transaction history will appear here
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Type</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Description</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Amount</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Status</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map((tx) => (
+                      <tr key={tx.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                        <td className="py-4 px-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="h-10 w-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                              {getTransactionIcon(tx.type)}
+                            </div>
+                            <span className="font-medium text-gray-900">{tx.type}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-gray-600">{tx.description}</td>
+                        <td className="py-4 px-4">
+                          <span className={`font-semibold ${
+                            tx.type.includes('DEPOSIT') || tx.type.includes('CREDIT')
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                          }`}>
+                            {tx.type.includes('DEPOSIT') || tx.type.includes('CREDIT') ? '+' : '-'}
+                            {formatCurrency(tx.amount)}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">{getStatusBadge(tx.status)}</td>
+                        <td className="py-4 px-4 text-sm text-gray-500">
+                          {formatDate(tx.created_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
