@@ -39,4 +39,34 @@ class TierAutomationTest extends TestCase
         $user->refresh();
         $this->assertEquals(2, $user->kyc_tier);
     }
+
+    /** @test */
+    public function it_can_downgrade_on_violation()
+    {
+        $user = User::factory()->create(['kyc_tier' => 2]);
+
+        $this->tierService->autoDowngradeOnViolation(
+            $user->id,
+            'test_violation',
+            'moderate',
+            'Test description'
+        );
+
+        $user->refresh();
+        $this->assertEquals(1, $user->kyc_tier);
+    }
+
+    /** @test */
+    public function it_can_check_upgrade_eligibility()
+    {
+        $user = User::factory()->create([
+            'kyc_tier' => 1,
+            'nin_verified' => true,
+            'bvn_verified' => true,
+        ]);
+
+        $result = $this->tierService->canUpgrade($user->id, 2);
+
+        $this->assertTrue($result['can_upgrade']);
+    }
 }

@@ -30,4 +30,12 @@ class MonitoringTest extends TestCase
         $this->assertArrayHasKey('risk_score', $risk);
         $this->assertArrayHasKey('total_alerts', $risk);
     }
+
+    /** @test */
+    public function it_can_get_pending_alerts()
+    {
+        $alerts = $this->monitoringService->getPendingAlerts();
+
+        $this->assertIsObject($alerts);
+    }
 }
