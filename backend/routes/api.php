@@ -375,3 +375,9 @@ Route::middleware('auth:sanctum')->group(function () {
 // Public review endpoints
 Route::get('/products/{productId}/reviews', [App\Http\Controllers\Api\ReviewController::class, 'getProductReviews']);
 Route::get('/products/{productId}/reviews/breakdown', [App\Http\Controllers\Api\ReviewController::class, 'getRatingBreakdown']);
+
+// Search
+Route::get('/search', [App\Http\Controllers\Api\SearchController::class, 'search']);
+Route::get('/search/suggestions', [App\Http\Controllers\Api\SearchController::class, 'suggestions']);
+Route::get('/search/popular', [App\Http\Controllers\Api\SearchController::class, 'popularSearches']);
+Route::get('/search/price-range', [App\Http\Controllers\Api\SearchController::class, 'priceRange']);
