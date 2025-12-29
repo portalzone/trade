@@ -436,3 +436,32 @@ Route::middleware('auth:sanctum')->group(function () {
     // Dashboard Stats
     Route::get('/monitoring/stats', [App\Http\Controllers\Api\MonitoringController::class, 'getDashboardStats']);
 });
+
+// Compliance & Reporting (Admin Only)
+Route::middleware('auth:sanctum')->group(function () {
+    // Compliance Reports
+    Route::post('/compliance/reports/cbn-monthly', [App\Http\Controllers\Api\ComplianceController::class, 'generateCBNReport']);
+    Route::post('/compliance/reports/quarterly-risk', [App\Http\Controllers\Api\ComplianceController::class, 'generateQuarterlyReport']);
+    Route::get('/compliance/reports', [App\Http\Controllers\Api\ComplianceController::class, 'getReports']);
+    Route::post('/compliance/reports/{id}/submit', [App\Http\Controllers\Api\ComplianceController::class, 'submitReport']);
+    
+    // Data Subject Rights (GDPR/NDPR)
+    Route::post('/compliance/data-subject-request', [App\Http\Controllers\Api\ComplianceController::class, 'createDataSubjectRequest']);
+    Route::get('/compliance/data-subject-requests', [App\Http\Controllers\Api\ComplianceController::class, 'getDataSubjectRequests']);
+    Route::post('/compliance/data-subject-requests/{id}/process', [App\Http\Controllers\Api\ComplianceController::class, 'processDataRequest']);
+    
+    // Record Retention
+    Route::get('/compliance/retention-policies', [App\Http\Controllers\Api\ComplianceController::class, 'getRetentionPolicies']);
+    Route::post('/compliance/retention-policies', [App\Http\Controllers\Api\ComplianceController::class, 'createRetentionPolicy']);
+    Route::post('/compliance/execute-deletions', [App\Http\Controllers\Api\ComplianceController::class, 'executeScheduledDeletions']);
+    
+    // Compliance Checklists
+    Route::get('/compliance/checklists', [App\Http\Controllers\Api\ComplianceController::class, 'getChecklists']);
+    Route::post('/compliance/checklists/{id}/items/{itemIndex}', [App\Http\Controllers\Api\ComplianceController::class, 'updateChecklistItem']);
+    
+    // Regulatory Submissions
+    Route::get('/compliance/submissions', [App\Http\Controllers\Api\ComplianceController::class, 'getSubmissions']);
+    
+    // Dashboard
+    Route::get('/compliance/dashboard', [App\Http\Controllers\Api\ComplianceController::class, 'getDashboard']);
+});
