@@ -349,3 +349,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Public product endpoints
 Route::get('/store/{slug}/products', [App\Http\Controllers\Api\ProductController::class, 'getStorefrontProducts']);
+
+// Categories
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/categories', [App\Http\Controllers\Api\CategoryController::class, 'create']);
+    Route::get('/categories/my', [App\Http\Controllers\Api\CategoryController::class, 'getMyCategories']);
+    Route::get('/categories/{id}', [App\Http\Controllers\Api\CategoryController::class, 'show']);
+    Route::put('/categories/{id}', [App\Http\Controllers\Api\CategoryController::class, 'update']);
+    Route::delete('/categories/{id}', [App\Http\Controllers\Api\CategoryController::class, 'delete']);
+});
+
+// Public category endpoints
+Route::get('/store/{slug}/categories', [App\Http\Controllers\Api\CategoryController::class, 'getStorefrontCategories']);
