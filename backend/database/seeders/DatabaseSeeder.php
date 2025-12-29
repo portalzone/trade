@@ -16,3 +16,7 @@ class DatabaseSeeder extends Seeder
         ]);
     }
 }
+        // Seed monitoring rules
+        $this->call([
+            \Database\Seeders\MonitoringRulesSeeder::class,
+        ]);

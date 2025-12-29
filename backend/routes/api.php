@@ -412,3 +412,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/inventory/low-stock', [App\Http\Controllers\Api\BulkOperationsController::class, 'getLowStockAlerts']);
     Route::get('/inventory/out-of-stock', [App\Http\Controllers\Api\BulkOperationsController::class, 'getOutOfStock']);
 });
+
+// Transaction Monitoring & Risk Detection (Admin Only)
+Route::middleware('auth:sanctum')->group(function () {
+    // Alerts
+    Route::get('/monitoring/alerts/pending', [App\Http\Controllers\Api\MonitoringController::class, 'getPendingAlerts']);
+    Route::get('/monitoring/alerts/severity/{severity}', [App\Http\Controllers\Api\MonitoringController::class, 'getAlertsBySeverity']);
+    Route::post('/monitoring/alerts/{id}/resolve', [App\Http\Controllers\Api\MonitoringController::class, 'resolveAlert']);
+    
+    // Risk Profiles
+    Route::get('/monitoring/risk-profile/{userId}', [App\Http\Controllers\Api\MonitoringController::class, 'getUserRiskProfile']);
+    
+    // SARs
+    Route::get('/monitoring/sars', [App\Http\Controllers\Api\MonitoringController::class, 'getSARs']);
+    Route::post('/monitoring/sars/{id}/submit', [App\Http\Controllers\Api\MonitoringController::class, 'submitSAR']);
+    
+    // Monitoring Rules
+    Route::get('/monitoring/rules', [App\Http\Controllers\Api\MonitoringController::class, 'getRules']);
+    Route::post('/monitoring/rules', [App\Http\Controllers\Api\MonitoringController::class, 'createRule']);
+    Route::put('/monitoring/rules/{id}', [App\Http\Controllers\Api\MonitoringController::class, 'updateRule']);
+    Route::delete('/monitoring/rules/{id}', [App\Http\Controllers\Api\MonitoringController::class, 'deleteRule']);
+    
+    // Dashboard Stats
+    Route::get('/monitoring/stats', [App\Http\Controllers\Api\MonitoringController::class, 'getDashboardStats']);
+});
