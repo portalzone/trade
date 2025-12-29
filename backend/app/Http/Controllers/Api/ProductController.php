@@ -5,16 +5,19 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\StorefrontProduct;
 use App\Services\ProductService;
+use App\Services\UserFeaturesService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
     protected ProductService $productService;
+    protected UserFeaturesService $userFeaturesService;
 
-    public function __construct(ProductService $productService)
+    public function __construct(ProductService $productService, UserFeaturesService $userFeaturesService)
     {
         $this->productService = $productService;
+        $this->userFeaturesService = $userFeaturesService;
     }
 
     /**
@@ -115,7 +118,7 @@ class ProductController extends Controller
     /**
      * Get single product
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         try {
             $product = StorefrontProduct::with(['category', 'storefront'])
@@ -123,6 +126,13 @@ class ProductController extends Controller
 
             // Increment views
             $product->incrementViews();
+
+            // Track in recently viewed
+            $this->userFeaturesService->trackView(
+                $request->user(),
+                $product->id,
+                $request->header('X-Session-Id') ?? session()->getId()
+            );
 
             return response()->json([
                 'success' => true,

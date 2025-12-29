@@ -381,3 +381,22 @@ Route::get('/search', [App\Http\Controllers\Api\SearchController::class, 'search
 Route::get('/search/suggestions', [App\Http\Controllers\Api\SearchController::class, 'suggestions']);
 Route::get('/search/popular', [App\Http\Controllers\Api\SearchController::class, 'popularSearches']);
 Route::get('/search/price-range', [App\Http\Controllers\Api\SearchController::class, 'priceRange']);
+
+// Wishlist
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/wishlist', [App\Http\Controllers\Api\UserFeaturesController::class, 'addToWishlist']);
+    Route::delete('/wishlist/{productId}', [App\Http\Controllers\Api\UserFeaturesController::class, 'removeFromWishlist']);
+    Route::get('/wishlist', [App\Http\Controllers\Api\UserFeaturesController::class, 'getWishlist']);
+    Route::get('/wishlist/check/{productId}', [App\Http\Controllers\Api\UserFeaturesController::class, 'checkWishlist']);
+});
+
+// Recently Viewed
+Route::get('/recently-viewed', [App\Http\Controllers\Api\UserFeaturesController::class, 'getRecentlyViewed']);
+
+// Best Sellers & Trending
+Route::get('/best-sellers', [App\Http\Controllers\Api\UserFeaturesController::class, 'getBestSellers']);
+Route::get('/trending', [App\Http\Controllers\Api\UserFeaturesController::class, 'getTrending']);
+Route::get('/top-rated', [App\Http\Controllers\Api\UserFeaturesController::class, 'getTopRated']);
+
+// Product Comparison
+Route::post('/compare', [App\Http\Controllers\Api\UserFeaturesController::class, 'compareProducts']);
