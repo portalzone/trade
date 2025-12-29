@@ -465,3 +465,27 @@ Route::middleware('auth:sanctum')->group(function () {
     // Dashboard
     Route::get('/compliance/dashboard', [App\Http\Controllers\Api\ComplianceController::class, 'getDashboard']);
 });
+
+// Tier Automation
+Route::middleware('auth:sanctum')->group(function () {
+    // Tier History & Changes
+    Route::get('/tiers/history/{userId}', [App\Http\Controllers\Api\TierAutomationController::class, 'getTierHistory']);
+    Route::get('/tiers/changes', [App\Http\Controllers\Api\TierAutomationController::class, 'getAllTierChanges']);
+    Route::get('/tiers/statistics', [App\Http\Controllers\Api\TierAutomationController::class, 'getTierStatistics']);
+    
+    // Manual Tier Management (Admin)
+    Route::post('/tiers/manual-change', [App\Http\Controllers\Api\TierAutomationController::class, 'manualTierChange']);
+    
+    // Violations
+    Route::post('/tiers/violations', [App\Http\Controllers\Api\TierAutomationController::class, 'createViolation']);
+    Route::get('/tiers/violations/{userId}', [App\Http\Controllers\Api\TierAutomationController::class, 'getUserViolations']);
+    
+    // Upgrade Requests
+    Route::post('/tiers/upgrade-request', [App\Http\Controllers\Api\TierAutomationController::class, 'submitUpgradeRequest']);
+    Route::get('/tiers/upgrade-requests', [App\Http\Controllers\Api\TierAutomationController::class, 'getUpgradeRequests']);
+    Route::post('/tiers/upgrade-requests/{id}/review', [App\Http\Controllers\Api\TierAutomationController::class, 'reviewUpgradeRequest']);
+    
+    // Notifications
+    Route::post('/tiers/process-notifications', [App\Http\Controllers\Api\TierAutomationController::class, 'processNotifications']);
+    Route::get('/tiers/pending-notifications', [App\Http\Controllers\Api\TierAutomationController::class, 'getPendingNotifications']);
+});
