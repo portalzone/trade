@@ -21,6 +21,59 @@ class ProductController extends Controller
     }
 
     /**
+     * List all active products (marketplace)
+     */
+    public function index(Request $request)
+    {
+        try {
+            $products = StorefrontProduct::with(['category', 'storefront'])
+                ->where('is_active', true)
+                ->when($request->get('category'), function ($query, $categoryId) {
+                    $query->where('category_id', $categoryId);
+                })
+                ->when($request->get('search'), function ($query, $search) {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('name', 'LIKE', "%{$search}%")
+                          ->orWhere('description', 'LIKE', "%{$search}%");
+                    });
+                })
+                ->when($request->get('min_price'), function ($query, $minPrice) {
+                    $query->where('price', '>=', $minPrice);
+                })
+                ->when($request->get('max_price'), function ($query, $maxPrice) {
+                    $query->where('price', '<=', $maxPrice);
+                })
+                ->when($request->get('sort'), function ($query, $sort) {
+                    if ($sort === 'price_low') {
+                        $query->orderBy('price', 'asc');
+                    } elseif ($sort === 'price_high') {
+                        $query->orderBy('price', 'desc');
+                    } elseif ($sort === 'popular') {
+                        $query->orderBy('sales_count', 'desc');
+                    } elseif ($sort === 'rating') {
+                        $query->orderBy('average_rating', 'desc');
+                    } else {
+                        $query->orderBy('created_at', 'desc');
+                    }
+                }, function ($query) {
+                    $query->orderBy('created_at', 'desc');
+                })
+                ->paginate($request->get('per_page', 24));
+
+            return response()->json([
+                'success' => true,
+                'data' => $products,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve products',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Add product to storefront
      */
     public function create(Request $request)

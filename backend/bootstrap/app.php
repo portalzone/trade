@@ -15,7 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->statefulApi();
+        // REMOVED: $middleware->statefulApi(); 
+        // This was causing CSRF protection on API routes
         
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
@@ -48,7 +49,6 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->is('api/*')) {
                 return true;
             }
-
             return $request->expectsJson();
         });
     })->create();

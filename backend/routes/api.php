@@ -338,6 +338,9 @@ Route::middleware('auth:sanctum')->group(function () {
 // Public storefront access
 Route::get('/store/{slug}', [App\Http\Controllers\Api\StorefrontController::class, 'show']);
 
+// PUBLIC PRODUCTS ENDPOINT - MUST BE BEFORE AUTH MIDDLEWARE
+Route::get('/products', [App\Http\Controllers\Api\ProductController::class, 'index']);
+
 // Products
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/products', [App\Http\Controllers\Api\ProductController::class, 'create']);
@@ -346,9 +349,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/products/{id}', [App\Http\Controllers\Api\ProductController::class, 'update']);
     Route::delete('/products/{id}', [App\Http\Controllers\Api\ProductController::class, 'delete']);
 });
-
-// Public product endpoints
-Route::get('/store/{slug}/products', [App\Http\Controllers\Api\ProductController::class, 'getStorefrontProducts']);
 
 // Categories
 Route::middleware('auth:sanctum')->group(function () {
