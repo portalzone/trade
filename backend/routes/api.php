@@ -493,3 +493,6 @@ Route::middleware('auth:sanctum')->group(function () {
 // Health Check Endpoints (No auth required)
 Route::get('/health', [App\Http\Controllers\Api\HealthController::class, 'index']);
 Route::get('/health/detailed', [App\Http\Controllers\Api\HealthController::class, 'detailed']);
+
+// Storefront Product Purchase (Marketplace Checkout)
+Route::post('/storefront/purchase', [App\Http\Controllers\Api\StorefrontPurchaseController::class, 'purchaseProduct'])->middleware('auth:sanctum');
