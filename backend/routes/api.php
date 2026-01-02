@@ -500,3 +500,69 @@ Route::get('/health/detailed', [App\Http\Controllers\Api\HealthController::class
 
 // Storefront Product Purchase (Marketplace Checkout)
 Route::post('/storefront/purchase', [App\Http\Controllers\Api\StorefrontPurchaseController::class, 'purchaseProduct'])->middleware('auth:sanctum');
+
+// Paystack Callback (Public route)
+Route::get('/payments/paystack/callback', function (Request $request) {
+    try {
+        $reference = $request->query('reference');
+        
+        if (!$reference) {
+            return redirect(config('app.frontend_url') . '/wallet?error=no_reference');
+        }
+
+        // Verify payment with Paystack
+        $paystack = app(\App\Services\Payment\PaystackService::class);
+        $verification = $paystack->verifyPayment($reference);
+
+        // Find transaction
+        $transaction = DB::table('payment_transactions')
+            ->where('gateway_reference', $reference)
+            ->first();
+
+        if (!$transaction) {
+            return redirect(config('app.frontend_url') . '/wallet?error=transaction_not_found');
+        }
+
+        if ($transaction->status === 'COMPLETED') {
+            return redirect(config('app.frontend_url') . '/wallet?status=already_completed');
+        }
+
+        DB::beginTransaction();
+
+        // Update transaction status
+        DB::table('payment_transactions')
+            ->where('id', $transaction->id)
+            ->update([
+                'status' => 'COMPLETED',
+                'completed_at' => now(),
+                'gateway_data' => json_encode($verification),
+                'updated_at' => now(),
+            ]);
+
+        // Credit wallet
+        DB::table('wallets')
+            ->where('id', $transaction->wallet_id)
+            ->increment('available_balance', $verification['amount']);
+
+        // Create ledger entry
+        DB::table('ledger_entries')->insert([
+            'transaction_id' => \Illuminate\Support\Str::uuid(),
+            'wallet_id' => $transaction->wallet_id,
+            'type' => 'CREDIT',
+            'amount' => $verification['amount'],
+            'description' => 'Wallet funded via Paystack',
+            'reference_table' => 'payment_transactions',
+            'reference_id' => $transaction->id,
+            'created_at' => now(),
+        ]);
+
+        DB::commit();
+
+        return redirect(config('app.frontend_url') . '/wallet?status=success&amount=' . $verification['amount']);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Paystack callback error: ' . $e->getMessage());
+        return redirect(config('app.frontend_url') . '/wallet?error=verification_failed');
+    }
+});
