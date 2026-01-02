@@ -20,8 +20,8 @@ export default function StoreSettingsPage() {
   const [storeName, setStoreName] = useState('');
   const [storeSlug, setStoreSlug] = useState('');
   const [description, setDescription] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -59,8 +59,8 @@ export default function StoreSettingsPage() {
         setStoreName(data.data.name || '');
         setStoreSlug(data.data.slug || '');
         setDescription(data.data.description || '');
-        setContactEmail(data.data.contact_email || '');
-        setContactPhone(data.data.contact_phone || '');
+        setEmail(data.data.email || '');
+        setPhone(data.data.phone || '');
       }
     } catch (error) {
       console.error('Error fetching store:', error);
@@ -87,8 +87,8 @@ export default function StoreSettingsPage() {
           name: storeName,
           slug: storeSlug,
           description: description,
-          contact_email: contactEmail,
-          contact_phone: contactPhone,
+          email: email,
+          phone: phone,
         }),
       });
 
@@ -173,7 +173,7 @@ export default function StoreSettingsPage() {
                   />
                 </div>
                 <p className="text-sm text-gray-500 mt-1">
-                  Your store URL will be: {window.location.origin}/store/{storeSlug || 'your-slug'}
+                  Your store URL will be: {typeof window !== 'undefined' ? window.location.origin : ''}/store/{storeSlug || 'your-slug'}
                 </p>
               </div>
 
@@ -196,8 +196,8 @@ export default function StoreSettingsPage() {
                 </label>
                 <input
                   type="email"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="contact@mystore.com"
                 />
@@ -209,8 +209,8 @@ export default function StoreSettingsPage() {
                 </label>
                 <input
                   type="tel"
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="+234 800 000 0000"
                 />
