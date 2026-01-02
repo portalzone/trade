@@ -23,7 +23,7 @@ interface RecentActivity {
   type: string;
   amount: string;
   description: string;
-  created_at: string;
+  date: string;
 }
 
 export default function DashboardPage() {
@@ -152,9 +152,11 @@ export default function DashboardPage() {
               <p className="text-xs text-gray-500 mt-1">
                 Including locked funds
               </p>
-              <button className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-semibold">
-                Deposit Funds →
-              </button>
+              <Link href="/wallet">
+                <button className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-semibold">
+                  Deposit Funds →
+                </button>
+              </Link>
             </CardContent>
           </Card>
 
@@ -172,9 +174,11 @@ export default function DashboardPage() {
               <p className="text-xs text-gray-500 mt-2">
                 User Type: {user.user_type}
               </p>
-              <button className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-semibold">
-                Upgrade Tier →
-              </button>
+              <Link href="/kyc">
+                <button className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-semibold">
+                  Upgrade Tier →
+                </button>
+              </Link>
             </CardContent>
           </Card>
         </div>
@@ -210,7 +214,7 @@ export default function DashboardPage() {
               <Link href="/marketplace">
                 <button className="w-full p-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition flex flex-col items-center space-y-2">
                   <ShoppingBag className="h-6 w-6" />
-                  <span className="text-sm font-semibold">Analytics</span>
+                  <span className="text-sm font-semibold">Marketplace</span>
                 </button>
               </Link>
             </div>
