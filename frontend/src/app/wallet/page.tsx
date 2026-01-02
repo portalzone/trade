@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { DepositModal } from '@/components/modals/DepositModal';
+import { WithdrawModal } from '@/components/modals/WithdrawModal';
 
 interface Transaction {
   id: number;
@@ -29,17 +31,21 @@ interface Transaction {
   amount: string;
   description: string;
   status: string;
-  created_at: string;
+  date: string;
   reference: string;
 }
 
 export default function WalletPage() {
   const router = useRouter();
-  const { user, wallet, updateWallet } = useAuthStore();
+  const { user, wallet, setWallet } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showBalance, setShowBalance] = useState(true);
+  
+  // Modal states
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -72,7 +78,7 @@ export default function WalletPage() {
       
       const walletData = await walletRes.json();
       if (walletData.success) {
-        updateWallet(walletData.data.wallet);
+        setWallet(walletData.data.wallet);
       }
 
       // Fetch transactions
@@ -93,6 +99,16 @@ export default function WalletPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleDepositSuccess = () => {
+    fetchWalletData();
+    toast.success('Deposit successful!');
+  };
+
+  const handleWithdrawSuccess = () => {
+    fetchWalletData();
+    toast.success('Withdrawal initiated successfully!');
   };
 
   if (!mounted || !user) {
@@ -218,7 +234,10 @@ export default function WalletPage() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button className="p-6 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg hover:shadow-xl group">
+          <button 
+            onClick={() => setShowDepositModal(true)}
+            className="p-6 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition shadow-lg hover:shadow-xl group"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <div className="h-12 w-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
@@ -233,7 +252,10 @@ export default function WalletPage() {
             </div>
           </button>
 
-          <button className="p-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition shadow-lg hover:shadow-xl group">
+          <button 
+            onClick={() => setShowWithdrawModal(true)}
+            className="p-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition shadow-lg hover:shadow-xl group"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <div className="h-12 w-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
@@ -290,7 +312,6 @@ export default function WalletPage() {
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Type</th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Description</th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Amount</th>
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Status</th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Date</th>
                     </tr>
                   </thead>
@@ -316,9 +337,8 @@ export default function WalletPage() {
                             {formatCurrency(tx.amount)}
                           </span>
                         </td>
-                        <td className="py-4 px-4">{getStatusBadge(tx.status)}</td>
                         <td className="py-4 px-4 text-sm text-gray-500">
-                          {formatDate(tx.created_at)}
+                          {formatDate(tx.date)}
                         </td>
                       </tr>
                     ))}
@@ -329,6 +349,20 @@ export default function WalletPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modals */}
+      <DepositModal 
+        isOpen={showDepositModal}
+        onClose={() => setShowDepositModal(false)}
+        onSuccess={handleDepositSuccess}
+      />
+      
+      <WithdrawModal 
+        isOpen={showWithdrawModal}
+        onClose={() => setShowWithdrawModal(false)}
+        onSuccess={handleWithdrawSuccess}
+        availableBalance={wallet?.available_balance || 0}
+      />
     </div>
   );
 }
