@@ -71,6 +71,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
     
+    // User Profile Management
+    Route::put('/user/profile', [App\Http\Controllers\Api\UserProfileController::class, 'updateProfile']);
+    Route::post('/user/change-password', [App\Http\Controllers\Api\UserProfileController::class, 'changePassword']);
+    
     // Wallet Routes
     Route::prefix('wallet')->group(function () {
         Route::get('/', function (Request $request) {
