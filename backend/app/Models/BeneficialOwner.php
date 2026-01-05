@@ -13,6 +13,7 @@ class BeneficialOwner extends Model
 
     protected $fillable = [
         'business_verification_id',
+        'tier3_verification_id',
         'full_name',
         'nin',
         'bvn',
@@ -26,6 +27,8 @@ class BeneficialOwner extends Model
         'ownership_type',
         'is_pep',
         'pep_details',
+        'id_type',
+        'id_number',
         'id_document_type',
         'id_document_path',
         'id_document_url',
@@ -46,6 +49,11 @@ class BeneficialOwner extends Model
     public function businessVerification(): BelongsTo
     {
         return $this->belongsTo(BusinessVerification::class);
+    }
+
+    public function tier3Verification(): BelongsTo
+    {
+        return $this->belongsTo(Tier3Verification::class);
     }
 
     public function sanctionsScreenings(): HasMany

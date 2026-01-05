@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
@@ -84,6 +85,8 @@ class AuthController extends Controller
                         'user_type' => $user->user_type,
                         'kyc_status' => $user->kyc_status,
                         'kyc_tier' => $user->kyc_tier,
+                        'account_status' => $user->account_status,
+                        'mfa_enabled' => $user->mfa_enabled,
                     ],
                     'wallet' => [
                         'id' => $wallet->id,
@@ -117,6 +120,8 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
+            'mfa_code' => ['nullable', 'string', 'size:6'],
+            'recovery_code' => ['nullable', 'string'],
         ]);
 
         if ($validator->fails()) {
@@ -146,18 +151,85 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Check if MFA is required (for admins and Tier 3)
+        // Check if MFA is required but not enabled - redirect to setup
         if ($user->requiresMfa() && !$user->mfa_enabled) {
+            // Generate temp token for MFA setup
+            $token = $user->createToken('mfa-setup-token')->plainTextToken;
+            
             return response()->json([
                 'success' => false,
                 'message' => 'MFA setup required for this account',
-                'requires_mfa_setup' => true
+                'requires_mfa_setup' => true,
+                'data' => [
+                    'token' => $token,
+                    'user' => [
+                        'id' => $user->id,
+                        'email' => $user->email,
+                        'full_name' => $user->full_name,
+                        'kyc_tier' => $user->kyc_tier,
+                        'mfa_enabled' => $user->mfa_enabled,
+                    ]
+                ]
             ], 403);
         }
 
-        // TODO: If MFA enabled, send OTP and wait for verification
+        // Check if MFA is enabled - require MFA code or recovery code
+        if ($user->mfa_enabled) {
+            // If no MFA code or recovery code provided, ask for it
+            if (!$request->mfa_code && !$request->recovery_code) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'MFA code or recovery code required',
+                    'requires_mfa_code' => true,
+                    'data' => [
+                        'email' => $user->email,
+                    ]
+                ], 403);
+            }
 
-        // Generate token
+            // Check if using recovery code
+            if ($request->recovery_code) {
+                // Validate and use recovery code
+                $recoveryCodes = json_decode($user->mfa_recovery_codes, true) ?? [];
+                
+                if (!in_array(strtoupper($request->recovery_code), $recoveryCodes)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid or already used recovery code',
+                        'requires_mfa_code' => true,
+                    ], 401);
+                }
+
+                // Remove used recovery code (single-use)
+                $recoveryCodes = array_values(array_diff($recoveryCodes, [strtoupper($request->recovery_code)]));
+                $user->update([
+                    'mfa_recovery_codes' => json_encode($recoveryCodes),
+                ]);
+
+                // Log recovery code usage for security
+                Log::warning('MFA recovery code used', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'ip' => $request->ip(),
+                    'remaining_codes' => count($recoveryCodes),
+                    'timestamp' => now(),
+                ]);
+            } else {
+                // Verify MFA code
+                $google2fa = new \PragmaRX\Google2FA\Google2FA();
+                $valid = $google2fa->verifyKey($user->mfa_secret, $request->mfa_code);
+
+                if (!$valid) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid MFA code',
+                        'requires_mfa_code' => true,
+                    ], 401);
+                }
+            }
+        }
+
+        // All checks passed - generate token
         $token = $user->createToken('auth-token')->plainTextToken;
 
         // Update last login
@@ -180,6 +252,7 @@ class AuthController extends Controller
                     'kyc_status' => $user->kyc_status,
                     'kyc_tier' => $user->kyc_tier,
                     'account_status' => $user->account_status,
+                    'mfa_enabled' => $user->mfa_enabled,
                 ],
                 'wallet' => [
                     'id' => $wallet->id,
@@ -192,7 +265,7 @@ class AuthController extends Controller
             ]
         ], 200);
     }
-
+    
     /**
      * Logout user (revoke token)
      * 
@@ -234,6 +307,7 @@ class AuthController extends Controller
                     'kyc_status' => $user->kyc_status,
                     'kyc_tier' => $user->kyc_tier,
                     'account_status' => $user->account_status,
+                    'mfa_enabled' => $user->mfa_enabled,
                     'transaction_limits' => $user->getTransactionLimits(),
                 ],
                 'wallet' => [

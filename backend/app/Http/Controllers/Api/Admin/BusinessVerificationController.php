@@ -17,19 +17,25 @@ class BusinessVerificationController extends Controller
         $this->businessService = $businessService;
     }
 
+    /**
+     * List all business verifications with filters
+     */
     public function index(Request $request)
     {
         $query = BusinessVerification::with(['user:id,full_name,email', 'directors', 'reviewer:id,full_name'])
             ->orderBy('submitted_at', 'desc');
 
+        // Filter by status
         if ($request->has('status')) {
             $query->where('verification_status', $request->status);
         }
 
+        // Filter by tier
         if ($request->has('tier')) {
             $query->where('tier', $request->tier);
         }
 
+        // Pending only
         if ($request->boolean('pending')) {
             $query->whereIn('verification_status', ['pending', 'under_review']);
         }
@@ -42,11 +48,14 @@ class BusinessVerificationController extends Controller
         ]);
     }
 
+    /**
+     * Get verification details
+     */
     public function show($id)
     {
         try {
             $verification = BusinessVerification::with([
-                'user:id,full_name,email,phone_number,kyc_tier',
+                'user:id,full_name,email,phone,kyc_tier',
                 'directors',
                 'reviewer:id,full_name'
             ])->findOrFail($id);
@@ -64,6 +73,9 @@ class BusinessVerificationController extends Controller
         }
     }
 
+    /**
+     * Approve business verification
+     */
     public function approve(Request $request, $id)
     {
         try {
@@ -92,6 +104,9 @@ class BusinessVerificationController extends Controller
         }
     }
 
+    /**
+     * Reject business verification
+     */
     public function reject(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
@@ -136,6 +151,9 @@ class BusinessVerificationController extends Controller
         }
     }
 
+    /**
+     * Request additional information
+     */
     public function requestInfo(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
@@ -153,6 +171,7 @@ class BusinessVerificationController extends Controller
         try {
             $verification = BusinessVerification::findOrFail($id);
 
+            // Add notes to verification_notes array
             $currentNotes = $verification->verification_notes ?? [];
             $currentNotes[] = [
                 'admin_id' => $request->user()->id,
@@ -182,6 +201,9 @@ class BusinessVerificationController extends Controller
         }
     }
 
+    /**
+     * Get verification statistics
+     */
     public function statistics()
     {
         $stats = [
@@ -193,6 +215,11 @@ class BusinessVerificationController extends Controller
             'requires_info' => BusinessVerification::where('verification_status', 'requires_additional_info')->count(),
             'tier2' => BusinessVerification::where('tier', 'tier2')->count(),
             'tier3' => BusinessVerification::where('tier', 'tier3')->count(),
+            'recent_submissions' => BusinessVerification::where('submitted_at', '>=', now()->subDays(7))->count(),
+            'avg_review_time_hours' => BusinessVerification::whereNotNull('reviewed_at')
+                ->whereNotNull('submitted_at')
+                ->selectRaw('AVG(EXTRACT(EPOCH FROM (reviewed_at - submitted_at))/3600) as avg_hours')
+                ->value('avg_hours'),
         ];
 
         return response()->json([

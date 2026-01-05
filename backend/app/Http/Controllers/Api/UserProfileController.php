@@ -15,8 +15,8 @@ class UserProfileController extends Controller
     public function updateProfile(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'full_name' => 'required|string|max:255',
-            'phone_number' => 'nullable|string|max:20',
+            'full_name' => 'sometimes|string|max:255',
+            'phone_number' => 'sometimes|string|max:20',
         ]);
 
         if ($validator->fails()) {
@@ -30,16 +30,36 @@ class UserProfileController extends Controller
         try {
             $user = $request->user();
             
-            $user->update([
-                'full_name' => $request->full_name,
-                'phone_number' => $request->phone_number,
-            ]);
+            // Only update fields that are provided
+            $updateData = [];
+            
+            if ($request->filled('full_name')) {
+                $updateData['full_name'] = $request->full_name;
+            }
+            
+            if ($request->filled('phone_number')) {
+                $updateData['phone_number'] = $request->phone_number;
+            }
+            
+            if (!empty($updateData)) {
+                $user->update($updateData);
+            }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
                 'data' => [
-                    'user' => $user->fresh(),
+                    'user' => [
+                        'id' => $user->id,
+                        'email' => $user->email,
+                        'phone_number' => $user->phone_number,
+                        'full_name' => $user->full_name,
+                        'username' => $user->username,
+                        'user_type' => $user->user_type,
+                        'kyc_tier' => $user->kyc_tier,
+                        'account_status' => $user->account_status,
+                        'mfa_enabled' => $user->mfa_enabled,
+                    ],
                 ],
             ]);
         } catch (\Exception $e) {

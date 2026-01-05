@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAdminAuthStore } from '@/store/adminAuthStore';
 import Link from 'next/link';
 
 interface Dispute {
@@ -26,6 +27,7 @@ interface Dispute {
 
 export default function AdminDisputesPage() {
   const router = useRouter();
+  const { adminToken, isHydrated } = useAdminAuthStore();
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -36,29 +38,22 @@ export default function AdminDisputesPage() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    const user = localStorage.getItem('user');
+    if (!isHydrated) return;
     
-    if (!token) {
-      router.push('/login');
+    if (!adminToken) {
+      router.push('/admin/login');
       return;
     }
 
-    const userData = user ? JSON.parse(user) : null;
-    if (userData?.user_type !== 'ADMIN') {
-      setError('Access denied. Admin only.');
-      return;
-    }
+    fetchDisputes();
+  }, [isHydrated, adminToken, router]);
 
-    fetchDisputes(token);
-  }, [router]);
-
-  const fetchDisputes = async (token: string) => {
+  const fetchDisputes = async () => {
     try {
       const response = await fetch('http://localhost:8000/api/admin/disputes', {
         headers: {
           'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${adminToken}`,
         },
       });
 
@@ -91,16 +86,13 @@ export default function AdminDisputesPage() {
     setIsResolving(true);
     setMessage('');
 
-    const token = localStorage.getItem('auth_token');
     const orderPrice = parseFloat(selectedDispute.order.price);
 
-    // Build request body
     const body: any = {
       resolution: resolutionType,
       admin_notes: adminNotes.trim(),
     };
 
-    // For partial resolution, calculate amounts (50/50 split)
     if (resolutionType === 'partial') {
       body.buyer_amount = orderPrice / 2;
       body.seller_amount = orderPrice / 2;
@@ -112,7 +104,7 @@ export default function AdminDisputesPage() {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${adminToken}`,
         },
         body: JSON.stringify(body),
       });
@@ -124,7 +116,7 @@ export default function AdminDisputesPage() {
         setSelectedDispute(null);
         setResolutionType('');
         setAdminNotes('');
-        fetchDisputes(token!);
+        fetchDisputes();
       } else {
         setMessage('❌ ' + (data.error || data.message || 'Failed to resolve dispute'));
       }
@@ -152,7 +144,7 @@ export default function AdminDisputesPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md text-center">
           <p className="text-red-800 mb-4">❌ {error}</p>
-          <Link href="/dashboard" className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
+          <Link href="/admin" className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
             Back to Dashboard
           </Link>
         </div>

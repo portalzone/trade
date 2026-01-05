@@ -566,3 +566,49 @@ Route::get('/payments/paystack/callback', function (Request $request) {
         return redirect(config('app.frontend_url') . '/wallet?error=verification_failed');
     }
 });
+
+// Tier 3 Verification Routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/tier3-verification/status', [App\Http\Controllers\Api\Tier3VerificationController::class, 'getStatus']);
+    Route::post('/tier3-verification', [App\Http\Controllers\Api\Tier3VerificationController::class, 'submit']);
+});
+
+// Tier 3 Verification Routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/tier3-verification/status', [App\Http\Controllers\Api\Tier3VerificationController::class, 'getStatus']);
+    Route::post('/tier3-verification', [App\Http\Controllers\Api\Tier3VerificationController::class, 'submit']);
+});
+
+// Admin Tier 3 Verification Routes
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin/tier3')->group(function () {
+    Route::get('/verifications', [App\Http\Controllers\Api\Tier3VerificationController::class, 'adminIndex']);
+    Route::post('/verifications/{id}/approve', [App\Http\Controllers\Api\Tier3VerificationController::class, 'adminApprove']);
+    Route::post('/verifications/{id}/reject', [App\Http\Controllers\Api\Tier3VerificationController::class, 'adminReject']);
+});
+
+// MFA Routes
+Route::middleware('auth:sanctum')->prefix('mfa')->group(function () {
+    Route::post('/setup', [App\Http\Controllers\Api\MfaController::class, 'setup']);
+    Route::post('/verify', [App\Http\Controllers\Api\MfaController::class, 'verify']);
+});
+
+Route::post('/mfa/verify-login', [App\Http\Controllers\Api\MfaController::class, 'verifyLogin']);
+
+
+
+// Admin User Management Routes (order matters!)
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
+    Route::get('/users/statistics', [App\Http\Controllers\Api\AdminUsersController::class, 'statistics']);
+    Route::get('/users', [App\Http\Controllers\Api\AdminUsersController::class, 'index']);
+    Route::get('/users/{id}', [App\Http\Controllers\Api\AdminUsersController::class, 'show']);
+    Route::post('/users/{id}/status', [App\Http\Controllers\Api\AdminUsersController::class, 'updateStatus']);
+});
+
+// MFA Recovery Codes
+Route::middleware('auth:sanctum')->prefix('mfa')->group(function () {
+    Route::get('/recovery-codes', [App\Http\Controllers\Api\MfaController::class, 'getRecoveryCodes']);
+    Route::post('/recovery-codes/regenerate', [App\Http\Controllers\Api\MfaController::class, 'regenerateRecoveryCodes']);
+});
+
+// Disable MFA
+Route::middleware('auth:sanctum')->post('/mfa/disable', [App\Http\Controllers\Api\MfaController::class, 'disable']);

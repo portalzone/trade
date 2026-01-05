@@ -29,6 +29,8 @@ class User extends Authenticatable
         'is_rider',
         'mfa_enabled',
         'mfa_method',
+        'mfa_secret',
+        'mfa_recovery_codes',
         'account_status',
         'kyc_submitted_at',
         'kyc_approved_at',
@@ -47,6 +49,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password_hash',
         'mfa_method',
+        'mfa_secret',
+        'mfa_recovery_codes',
     ];
 
     /**
@@ -125,14 +129,6 @@ class User extends Authenticatable
     public function riderProfile()
     {
         return $this->hasOne(Rider::class);
-    }
-
-    /**
-     * Get user's storefront
-     */
-    public function storefront()
-    {
-        return $this->hasOne(\App\Models\Storefront::class);
     }
 
     // ============================================

@@ -100,7 +100,7 @@ export default function KYCUpgradePage() {
       tier: 3,
       name: 'Tier 3 - Enterprise',
       status: currentTier >= 3 ? 'completed' : currentTier === 2 ? 'available' : 'locked',
-      upgradeRoute: null, // Coming soon
+      upgradeRoute: '/kyc/tier3',
       limits: {
         transaction: 'Unlimited',
         daily: 'Unlimited',
