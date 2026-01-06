@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAdminAuthStore } from '@/store/adminAuthStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import MfaActivityLog from '@/components/MfaActivityLog';
 import { 
   User, 
   Lock, 
@@ -231,7 +232,6 @@ export default function AdminSettingsPage() {
         setMfaEnabled(false);
         setShowRecoveryCodes(false);
         setRecoveryCodes([]);
-        // Refresh page to update admin user state
         setTimeout(() => window.location.reload(), 1000);
       } else {
         toast.error(data.message || 'Failed to disable MFA');
@@ -464,6 +464,11 @@ export default function AdminSettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* MFA Activity Log - Full Width */}
+      {mfaEnabled && adminToken && (
+        <MfaActivityLog token={adminToken} />
+      )}
 
       {/* Recovery Codes Modal */}
       {showRecoveryCodes && (

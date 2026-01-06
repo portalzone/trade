@@ -5,16 +5,21 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessVerification;
 use App\Services\BusinessVerificationService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class BusinessVerificationController extends Controller
 {
     protected BusinessVerificationService $businessService;
+    protected NotificationService $notificationService;
 
-    public function __construct(BusinessVerificationService $businessService)
-    {
+    public function __construct(
+        BusinessVerificationService $businessService,
+        NotificationService $notificationService
+    ) {
         $this->businessService = $businessService;
+        $this->notificationService = $notificationService;
     }
 
     /**
@@ -79,7 +84,7 @@ class BusinessVerificationController extends Controller
     public function approve(Request $request, $id)
     {
         try {
-            $verification = BusinessVerification::findOrFail($id);
+            $verification = BusinessVerification::with('user')->findOrFail($id);
 
             if ($verification->verification_status === 'verified') {
                 return response()->json([
@@ -89,6 +94,9 @@ class BusinessVerificationController extends Controller
             }
 
             $approved = $this->businessService->approveVerification($verification, $request->user());
+
+            // Send email notification
+            $this->notificationService->sendKycApproved($verification->user, 2);
 
             return response()->json([
                 'success' => true,
@@ -122,7 +130,7 @@ class BusinessVerificationController extends Controller
         }
 
         try {
-            $verification = BusinessVerification::findOrFail($id);
+            $verification = BusinessVerification::with('user')->findOrFail($id);
 
             if ($verification->verification_status === 'verified') {
                 return response()->json([
@@ -136,6 +144,9 @@ class BusinessVerificationController extends Controller
                 $request->user(),
                 $request->reason
             );
+
+            // Send email notification
+            $this->notificationService->sendKycRejected($verification->user, 2, $request->reason);
 
             return response()->json([
                 'success' => true,

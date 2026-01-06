@@ -5,16 +5,21 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Dispute;
 use App\Services\DisputeService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class DisputeController extends Controller
 {
     protected DisputeService $disputeService;
+    protected NotificationService $notificationService;
 
-    public function __construct(DisputeService $disputeService)
-    {
+    public function __construct(
+        DisputeService $disputeService,
+        NotificationService $notificationService
+    ) {
         $this->disputeService = $disputeService;
+        $this->notificationService = $notificationService;
     }
 
     /**
@@ -85,7 +90,7 @@ class DisputeController extends Controller
         }
 
         try {
-            $dispute = Dispute::findOrFail($id);
+            $dispute = Dispute::with(['order.buyer', 'order.seller'])->findOrFail($id);
 
             // Check if already resolved
             if ($dispute->isResolved()) {
@@ -102,6 +107,7 @@ class DisputeController extends Controller
                         $request->admin_notes
                     );
                     $message = 'Dispute resolved in favor of buyer - Full refund issued';
+                    $resolution = 'Resolved in favor of buyer with full refund';
                     break;
 
                 case 'seller':
@@ -110,6 +116,7 @@ class DisputeController extends Controller
                         $request->admin_notes
                     );
                     $message = 'Dispute resolved in favor of seller - Full payment released';
+                    $resolution = 'Resolved in favor of seller with full payment';
                     break;
 
                 case 'partial':
@@ -120,8 +127,13 @@ class DisputeController extends Controller
                         $request->admin_notes
                     );
                     $message = "Dispute resolved with partial refund - Buyer: ₦{$request->buyer_amount}, Seller: ₦{$request->seller_amount}";
+                    $resolution = "Partial refund - Buyer receives ₦{$request->buyer_amount}, Seller receives ₦{$request->seller_amount}";
                     break;
             }
+
+            // Send email notifications to both parties
+            $this->notificationService->sendDisputeUpdate($dispute->order->buyer, $result, $resolution);
+            $this->notificationService->sendDisputeUpdate($dispute->order->seller, $result, $resolution);
 
             return response()->json([
                 'success' => true,

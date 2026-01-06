@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\MfaActivityLog;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use PragmaRX\Google2FA\Google2FA;
@@ -14,10 +16,12 @@ use BaconQrCode\Writer;
 class MfaController extends Controller
 {
     protected $google2fa;
+    protected NotificationService $notificationService;
 
-    public function __construct()
+    public function __construct(NotificationService $notificationService)
     {
         $this->google2fa = new Google2FA();
+        $this->notificationService = $notificationService;
     }
 
     /**
@@ -48,6 +52,9 @@ class MfaController extends Controller
 
             // Save secret to user (but don't enable MFA yet)
             $user->update(['mfa_secret' => $secret]);
+
+            // Log activity
+            MfaActivityLog::logActivity($user->id, 'setup');
 
             return response()->json([
                 'success' => true,
@@ -98,6 +105,11 @@ class MfaController extends Controller
             $valid = $this->google2fa->verifyKey($user->mfa_secret, $request->code);
 
             if (!$valid) {
+                // Log failed verification
+                MfaActivityLog::logActivity($user->id, 'verify_failed', [
+                    'reason' => 'Invalid code'
+                ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid verification code'
@@ -113,6 +125,12 @@ class MfaController extends Controller
                 'mfa_method' => 'TOTP',
                 'mfa_recovery_codes' => json_encode($recoveryCodes),
             ]);
+
+            // Log successful verification
+            MfaActivityLog::logActivity($user->id, 'verify_success');
+
+            // Send email notification
+            $this->notificationService->sendMfaNotification($user, 'enabled');
 
             return response()->json([
                 'success' => true,
@@ -163,6 +181,11 @@ class MfaController extends Controller
             $valid = $this->google2fa->verifyKey($user->mfa_secret, $request->code);
 
             if (!$valid) {
+                // Log failed login attempt
+                MfaActivityLog::logActivity($user->id, 'login_failed', [
+                    'reason' => 'Invalid MFA code'
+                ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid verification code'
@@ -172,6 +195,9 @@ class MfaController extends Controller
             // Generate token
             $token = $user->createToken('auth-token')->plainTextToken;
             $user->recordLogin();
+
+            // Log successful login
+            MfaActivityLog::logActivity($user->id, 'login_success');
 
             return response()->json([
                 'success' => true,
@@ -218,7 +244,6 @@ class MfaController extends Controller
                 ], 404);
             }
 
-            // Decrypt and return recovery codes
             $recoveryCodes = json_decode($user->mfa_recovery_codes, true);
 
             return response()->json([
@@ -251,7 +276,6 @@ class MfaController extends Controller
                 ], 400);
             }
 
-            // Generate new recovery codes
             $recoveryCodes = [];
             for ($i = 0; $i < 10; $i++) {
                 $recoveryCodes[] = strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
@@ -260,6 +284,9 @@ class MfaController extends Controller
             $user->update([
                 'mfa_recovery_codes' => json_encode($recoveryCodes),
             ]);
+
+            // Log activity
+            MfaActivityLog::logActivity($user->id, 'codes_regenerated');
 
             return response()->json([
                 'success' => true,
@@ -277,9 +304,6 @@ class MfaController extends Controller
         }
     }
 
-    /**
-     * Generate recovery codes
-     */
     /**
      * Disable MFA for the authenticated user
      */
@@ -307,7 +331,6 @@ class MfaController extends Controller
                 ], 400);
             }
 
-            // Verify password before disabling MFA
             if (!\Illuminate\Support\Facades\Hash::check($request->password, $user->password_hash)) {
                 return response()->json([
                     'success' => false,
@@ -315,13 +338,18 @@ class MfaController extends Controller
                 ], 401);
             }
 
-            // Disable MFA and clear secrets
             $user->update([
                 'mfa_enabled' => false,
                 'mfa_secret' => null,
                 'mfa_recovery_codes' => null,
                 'mfa_method' => null,
             ]);
+
+            // Log activity
+            MfaActivityLog::logActivity($user->id, 'disabled');
+
+            // Send email notification
+            $this->notificationService->sendMfaNotification($user, 'disabled');
 
             return response()->json([
                 'success' => true,
@@ -336,6 +364,31 @@ class MfaController extends Controller
         }
     }
 
+    /**
+     * Get MFA activity logs
+     */
+    public function getActivityLogs(Request $request)
+    {
+        try {
+            $user = $request->user();
+            
+            $logs = MfaActivityLog::where('user_id', $user->id)
+                ->orderBy('created_at', 'desc')
+                ->limit($request->get('limit', 50))
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $logs,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve activity logs',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 
     private function generateRecoveryCodes(): array
     {

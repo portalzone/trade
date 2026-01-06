@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Tier3Verification;
 use App\Models\BeneficialOwner;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +13,13 @@ use Illuminate\Support\Facades\Validator;
 
 class Tier3VerificationController extends Controller
 {
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     /**
      * Get verification status for current user
      */
@@ -194,10 +202,13 @@ class Tier3VerificationController extends Controller
 
             $verification->user->update([
                 'kyc_tier' => 3,
-                'kyc_status' => 'ENTERPRISE_VERIFIED',  // FIX: Changed from 'verified' to 'ENTERPRISE_VERIFIED'
+                'kyc_status' => 'ENTERPRISE_VERIFIED',
             ]);
 
             DB::commit();
+
+            // Send email notification
+            $this->notificationService->sendKycApproved($verification->user, 3);
 
             return response()->json([
                 'success' => true,
@@ -214,6 +225,7 @@ class Tier3VerificationController extends Controller
             ], 500);
         }
     }
+
     /**
      * Admin: Reject Tier 3 verification
      */
@@ -234,7 +246,7 @@ class Tier3VerificationController extends Controller
         try {
             DB::beginTransaction();
 
-            $verification = Tier3Verification::findOrFail($id);
+            $verification = Tier3Verification::with('user')->findOrFail($id);
 
             $verification->update([
                 'verification_status' => 'rejected',
@@ -244,6 +256,9 @@ class Tier3VerificationController extends Controller
             ]);
 
             DB::commit();
+
+            // Send email notification
+            $this->notificationService->sendKycRejected($verification->user, 3, $request->reason);
 
             return response()->json([
                 'success' => true,

@@ -622,3 +622,6 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin/analytics')->group(f
     Route::get('/kyc-rates', [App\Http\Controllers\Api\Admin\AnalyticsController::class, 'kycRates']);
     Route::get('/user-distribution', [App\Http\Controllers\Api\Admin\AnalyticsController::class, 'userDistribution']);
 });
+
+// MFA Activity Logs
+Route::middleware('auth:sanctum')->get('/mfa/activity-logs', [App\Http\Controllers\Api\MfaController::class, 'getActivityLogs']);

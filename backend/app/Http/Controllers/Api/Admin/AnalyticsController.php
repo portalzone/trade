@@ -210,15 +210,15 @@ class AnalyticsController extends Controller
         try {
             // Tier 2 stats
             $tier2Total = BusinessVerification::count();
-            $tier2Approved = BusinessVerification::where('verification_status', 'APPROVED')->count();
-            $tier2Rejected = BusinessVerification::where('verification_status', 'REJECTED')->count();
-            $tier2Pending = BusinessVerification::where('verification_status', 'PENDING')->count();
+            $tier2Approved = BusinessVerification::where('verification_status', 'verified')->count();
+            $tier2Rejected = BusinessVerification::where('verification_status', 'rejected')->count();
+            $tier2Pending = BusinessVerification::whereIn('verification_status', ['pending', 'PENDING'])->count();
 
             // Tier 3 stats
             $tier3Total = Tier3Verification::count();
-            $tier3Approved = Tier3Verification::where('verification_status', 'APPROVED')->count();
-            $tier3Rejected = Tier3Verification::where('verification_status', 'REJECTED')->count();
-            $tier3Pending = Tier3Verification::whereIn('verification_status', ['PENDING_REVIEW', 'UNDER_REVIEW'])->count();
+            $tier3Approved = Tier3Verification::where('verification_status', 'verified')->count();
+            $tier3Rejected = Tier3Verification::where('verification_status', 'rejected')->count();
+            $tier3Pending = Tier3Verification::whereIn('verification_status', ['pending', 'PENDING_REVIEW', 'UNDER_REVIEW'])->count();
 
             return response()->json([
                 'success' => true,

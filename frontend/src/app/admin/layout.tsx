@@ -12,7 +12,8 @@ import {
   AlertTriangle,
   Settings,
   LogOut,
-  Menu
+  Menu,
+  BarChart3
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -43,6 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'KYC Approvals', href: '/admin/kyc', icon: FileCheck },
     { name: 'Tier 3 Approvals', href: '/admin/tier3', icon: Shield },
     { name: 'Disputes', href: '/admin/disputes', icon: AlertTriangle },
