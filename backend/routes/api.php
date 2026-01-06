@@ -612,3 +612,13 @@ Route::middleware('auth:sanctum')->prefix('mfa')->group(function () {
 
 // Disable MFA
 Route::middleware('auth:sanctum')->post('/mfa/disable', [App\Http\Controllers\Api\MfaController::class, 'disable']);
+
+// Admin Analytics Routes
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin/analytics')->group(function () {
+    Route::get('/overview', [App\Http\Controllers\Api\Admin\AnalyticsController::class, 'overview']);
+    Route::get('/user-growth', [App\Http\Controllers\Api\Admin\AnalyticsController::class, 'userGrowth']);
+    Route::get('/transaction-volume', [App\Http\Controllers\Api\Admin\AnalyticsController::class, 'transactionVolume']);
+    Route::get('/revenue', [App\Http\Controllers\Api\Admin\AnalyticsController::class, 'revenue']);
+    Route::get('/kyc-rates', [App\Http\Controllers\Api\Admin\AnalyticsController::class, 'kycRates']);
+    Route::get('/user-distribution', [App\Http\Controllers\Api\Admin\AnalyticsController::class, 'userDistribution']);
+});
