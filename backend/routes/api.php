@@ -625,3 +625,6 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin/analytics')->group(f
 
 // MFA Activity Logs
 Route::middleware('auth:sanctum')->get('/mfa/activity-logs', [App\Http\Controllers\Api\MfaController::class, 'getActivityLogs']);
+
+// Admin: Update user email
+Route::middleware(['auth:sanctum', 'admin'])->post('/admin/users/{id}/email', [App\Http\Controllers\Api\AdminUsersController::class, 'updateEmail']);

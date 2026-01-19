@@ -176,6 +176,55 @@ class AdminUsersController extends Controller
     }
 
     /**
+     * Update user email address (Admin only)
+     */
+    public function updateEmail(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email|unique:users,email,' . $id,
+            'reason' => 'required|string|max:500'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $user = User::findOrFail($id);
+
+            $oldEmail = $user->email;
+
+            $user->update([
+                'email' => $request->email,
+                'email_verified_at' => null,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User email updated successfully',
+                'data' => [
+                    'user' => [
+                        'id' => $user->id,
+                        'email' => $user->email,
+                        'old_email' => $oldEmail,
+                    ]
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update user email',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Get user statistics
      */
     public function statistics()
