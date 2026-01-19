@@ -16,8 +16,10 @@ import {
   Shield,
   Mail,
   Phone,
-  Calendar
+  Calendar,
+  Edit
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface User {
   id: number;
@@ -66,9 +68,17 @@ export default function AdminUsersPage() {
   const [stats, setStats] = useState<Statistics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState<'status' | 'email'>('status');
+  
+  // Status update fields
   const [newStatus, setNewStatus] = useState('');
   const [statusReason, setStatusReason] = useState('');
+  
+  // Email update fields
+  const [newEmail, setNewEmail] = useState('');
+  const [emailReason, setEmailReason] = useState('');
+  
   const [isUpdating, setIsUpdating] = useState(false);
   
   // Filters
@@ -133,7 +143,7 @@ export default function AdminUsersPage() {
 
   const handleUpdateStatus = async () => {
     if (!selectedUser || !newStatus || !statusReason.trim()) {
-      alert('Please select status and provide reason');
+      toast.error('Please select status and provide reason');
       return;
     }
 
@@ -152,21 +162,70 @@ export default function AdminUsersPage() {
       });
       const data = await response.json();
       if (data.success) {
-        alert('✅ User status updated successfully!');
-        setShowStatusModal(false);
-        setSelectedUser(null);
-        setNewStatus('');
-        setStatusReason('');
+        toast.success('User status updated successfully!');
+        closeModal();
         fetchUsers();
         fetchStats();
       } else {
-        alert('❌ ' + (data.message || 'Failed to update status'));
+        toast.error(data.message || 'Failed to update status');
       }
     } catch (error) {
-      alert('❌ Connection error');
+      toast.error('Connection error');
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleUpdateEmail = async () => {
+    if (!selectedUser || !newEmail.trim() || !emailReason.trim()) {
+      toast.error('Please provide email and reason');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/admin/users/${selectedUser.id}/email`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: newEmail,
+          reason: emailReason
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('User email updated successfully!');
+        closeModal();
+        fetchUsers();
+      } else {
+        toast.error(data.message || 'Failed to update email');
+      }
+    } catch (error) {
+      toast.error('Connection error');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const openModal = (user: User, type: 'status' | 'email') => {
+    setSelectedUser(user);
+    setModalType(type);
+    if (type === 'email') {
+      setNewEmail(user.email);
+    }
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedUser(null);
+    setNewStatus('');
+    setStatusReason('');
+    setNewEmail('');
+    setEmailReason('');
   };
 
   const getStatusColor = (status: string) => {
@@ -348,15 +407,23 @@ export default function AdminUsersPage() {
                       {new Date(user.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowStatusModal(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-700 font-semibold"
-                      >
-                        Manage
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openModal(user, 'status')}
+                          className="text-blue-600 hover:text-blue-700 font-semibold text-sm"
+                          title="Update Status"
+                        >
+                          Status
+                        </button>
+                        <button
+                          onClick={() => openModal(user, 'email')}
+                          className="text-green-600 hover:text-green-700 font-semibold text-sm flex items-center gap-1"
+                          title="Update Email"
+                        >
+                          <Mail className="h-4 w-4" />
+                          Email
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -387,61 +454,97 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      {/* Status Update Modal */}
-      {showStatusModal && selectedUser && (
+      {/* Modal */}
+      {showModal && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
-            <h2 className="text-2xl font-bold mb-6">Update User Status</h2>
+            <h2 className="text-2xl font-bold mb-6">
+              {modalType === 'status' ? 'Update User Status' : 'Update User Email'}
+            </h2>
 
             <div className="mb-6">
               <p className="mb-2"><strong>User:</strong> {selectedUser.full_name}</p>
-              <p className="mb-2"><strong>Email:</strong> {selectedUser.email}</p>
-              <p className="mb-4"><strong>Current Status:</strong> <span className={`px-2 py-1 rounded text-sm ${getStatusColor(selectedUser.account_status)}`}>{selectedUser.account_status}</span></p>
+              <p className="mb-2"><strong>Current Email:</strong> {selectedUser.email}</p>
+              {modalType === 'status' && (
+                <p className="mb-4">
+                  <strong>Current Status:</strong>{' '}
+                  <span className={`px-2 py-1 rounded text-sm ${getStatusColor(selectedUser.account_status)}`}>
+                    {selectedUser.account_status}
+                  </span>
+                </p>
+              )}
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">New Status</label>
-              <select
-                value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg"
-              >
-                <option value="">Select status...</option>
-                <option value="ACTIVE">Active</option>
-                <option value="SUSPENDED">Suspended</option>
-                <option value="BANNED">Banned</option>
-              </select>
-            </div>
+            {modalType === 'status' ? (
+              <>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">New Status</label>
+                  <select
+                    value={newStatus}
+                    onChange={(e) => setNewStatus(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg"
+                  >
+                    <option value="">Select status...</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="SUSPENDED">Suspended</option>
+                    <option value="BANNED">Banned</option>
+                  </select>
+                </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">Reason (Required)</label>
-              <textarea
-                value={statusReason}
-                onChange={(e) => setStatusReason(e.target.value)}
-                rows={3}
-                className="w-full px-4 py-2 border rounded-lg"
-                placeholder="Explain why you're changing the status..."
-              />
-            </div>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium mb-2">Reason (Required)</label>
+                  <textarea
+                    value={statusReason}
+                    onChange={(e) => setStatusReason(e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-2 border rounded-lg"
+                    placeholder="Explain why you're changing the status..."
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">New Email</label>
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg"
+                    placeholder="user@example.com"
+                  />
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium mb-2">Reason (Required)</label>
+                  <textarea
+                    value={emailReason}
+                    onChange={(e) => setEmailReason(e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-2 border rounded-lg"
+                    placeholder="Explain why you're changing the email..."
+                  />
+                </div>
+              </>
+            )}
 
             <div className="flex gap-4">
               <button
-                onClick={() => {
-                  setShowStatusModal(false);
-                  setSelectedUser(null);
-                  setNewStatus('');
-                  setStatusReason('');
-                }}
+                onClick={closeModal}
                 className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300"
               >
                 Cancel
               </button>
               <button
-                onClick={handleUpdateStatus}
-                disabled={isUpdating || !newStatus || !statusReason.trim()}
+                onClick={modalType === 'status' ? handleUpdateStatus : handleUpdateEmail}
+                disabled={
+                  isUpdating ||
+                  (modalType === 'status' && (!newStatus || !statusReason.trim())) ||
+                  (modalType === 'email' && (!newEmail.trim() || !emailReason.trim()))
+                }
                 className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                {isUpdating ? 'Updating...' : 'Update Status'}
+                {isUpdating ? 'Updating...' : 'Update'}
               </button>
             </div>
           </div>
